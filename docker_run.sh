@@ -65,8 +65,8 @@ docker run \
   --privileged \
   --volume=$XSOCK:$XSOCK:rw \
   --volume=$XAUTH:$XAUTH:rw \
-  --volume=$SRC_LOCAL:$SRC_DOCKER \
-  --volume=${PWD}/startup/challenge:/root/sim_ws/src/icuas24_competition/startup/challenge \
+  --volume=$SRC_LOCAL:$SRC_DOCKER:Z \
+  --volume=${PWD}/startup/challenge:/root/sim_ws/src/icuas24_competition/startup/challenge:Z \
   --env="XAUTHORITY=${XAUTH}" \
   --env DISPLAY=$DISPLAY \
   --env TERM=xterm-256color \
