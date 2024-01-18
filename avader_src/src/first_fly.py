@@ -97,12 +97,15 @@ def talker():
     rospy.loginfo("Challenge started")
     step = 0
 
-    while not rospy.is_shutdown():
-        if step == 500:
+    tracker_ready = False
+    while not tracker_ready:
+        data = rospy.wait_for_message("/red/tracker/status", String)
+        if data.data == "ACCEPT":
+            tracker_ready = True
+            rospy.loginfo("Tracker ready")
+
             set_setpoint(SETPOINTS[STAGE])
             break
-        rate.sleep()
-        step += 1
 
     rospy.Subscriber("/red/tracker/status", String, check_completion)
 

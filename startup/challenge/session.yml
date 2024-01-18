@@ -99,11 +99,11 @@ windows:
   - avader_controller:
       layout: tiled
       panes:
-        - waitForRos; rosrun avader_src first_fly.py
+        - waitForRos; rosrun avader_src path_setter.py
   - topics_listener:
       layout: tiled
       panes:
         - waitForRos; rostopic echo /red/tracker/status
-        - waitForRos; rostopic echo /red/plants_beds
+        - waitForRos; rostopic echo /fruit_count
         - waitForRos; rostopic echo /red/tracker/input_pose
         - waitForRos; rostopic echo /red/odometry
