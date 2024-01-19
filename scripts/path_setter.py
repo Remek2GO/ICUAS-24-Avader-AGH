@@ -9,21 +9,25 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List
 
+
 class PlantType(Enum):
     PEPPER = "PEPPER"
     TOMATO = "TOMATO"
     EGGPLANT = "EGGPLANT"
+
 
 class TrackerStatus(Enum):
     OFF = "OFF"
     ACTIVE = "ACTIVE"
     ACCEPT = "ACCEPT"
 
+
 class PathStatus(Enum):
     REACHED = 0
     PROGRESS = 1
     COMPLETED = 2
     WAITING = 3
+
 
 @dataclass
 class Setpoint:
@@ -34,16 +38,18 @@ class Setpoint:
     pitch: float
     yaw: float
 
+
 @dataclass
 class PlantBed:
     plant_type: PlantType
     bed_ids: List[int]
 
+
 class PathSetter:
     def __init__(self) -> None:
-        rospy.init_node('avader_uav', anonymous=True)
+        rospy.init_node("avader_uav", anonymous=True)
         rospy.loginfo("avader_uav node started")
-        
+
         self.challenge_started = False
         self.plant_beds: PlantBed | None = None
         self.tracker_status = TrackerStatus.OFF
@@ -51,11 +57,19 @@ class PathSetter:
         self.path_status = PathStatus.REACHED
         self.rate = rospy.Rate(20)
 
-        self.pub_pose = rospy.Publisher("/red/tracker/input_pose", PoseStamped, queue_size=10)
+        self.pub_pose = rospy.Publisher(
+            "/red/tracker/input_pose", PoseStamped, queue_size=10
+        )
         self.pub_fruit_count = rospy.Publisher("/fruit_count", Int32, queue_size=10)
-        self.sub_challenge_started = rospy.Subscriber("/red/challenge_started", Bool, self.set_challenge_started)
-        self.sub_plants_beds = rospy.Subscriber("/red/plants_beds", String, self.set_plants_beds)
-        self.sub_tracker_status = rospy.Subscriber("/red/tracker/status", String, self.check_tracker_status)
+        self.sub_challenge_started = rospy.Subscriber(
+            "/red/challenge_started", Bool, self.set_challenge_started
+        )
+        self.sub_plants_beds = rospy.Subscriber(
+            "/red/plants_beds", String, self.set_plants_beds
+        )
+        self.sub_tracker_status = rospy.Subscriber(
+            "/red/tracker/status", String, self.check_tracker_status
+        )
 
         self.setpoints: List[Setpoint] = []
 
@@ -66,7 +80,9 @@ class PathSetter:
     def set_plants_beds(self, data: String):
         plant_beds = data.data.split(" ")
 
-        self.plant_beds = PlantBed(PlantType(plant_beds[0].upper()), [int(bed_id) for bed_id in plant_beds[1:]])
+        self.plant_beds = PlantBed(
+            PlantType(plant_beds[0].upper()), [int(bed_id) for bed_id in plant_beds[1:]]
+        )
 
     def check_tracker_status(self, data: String):
         self.tracker_status = TrackerStatus(data.data)
@@ -91,25 +107,39 @@ class PathSetter:
 
     def wait_for_challenge_start(self):
         rospy.loginfo("Waiting for challenge to start")
-        while not self.challenge_started or self.plant_beds == None or self.tracker_status == TrackerStatus.OFF:
+        while (
+            not self.challenge_started
+            or self.plant_beds == None
+            or self.tracker_status == TrackerStatus.OFF
+        ):
             self.rate.sleep()
         rospy.loginfo("Challenge started")
 
     def run(self):
         while not self.path_status == PathStatus.COMPLETED:
-            if self.path_status == PathStatus.REACHED and self.idx_setpoint == len(self.setpoints):
+            if self.path_status == PathStatus.REACHED and self.idx_setpoint == len(
+                self.setpoints
+            ):
                 self.path_status = PathStatus.COMPLETED
                 self.handle_challenge_completed()
                 return
-            
-            if self.tracker_status == TrackerStatus.ACTIVE and self.path_status == PathStatus.WAITING:
+
+            if (
+                self.tracker_status == TrackerStatus.ACTIVE
+                and self.path_status == PathStatus.WAITING
+            ):
                 self.path_status = PathStatus.PROGRESS
 
-            if self.path_status == PathStatus.PROGRESS and self.tracker_status == TrackerStatus.ACCEPT:
+            if (
+                self.path_status == PathStatus.PROGRESS
+                and self.tracker_status == TrackerStatus.ACCEPT
+            ):
                 self.path_status = PathStatus.REACHED
                 rospy.loginfo("Setpoint reached")
             elif self.path_status == PathStatus.REACHED:
-                rospy.loginfo("Setting new setpoint")
+                rospy.loginfo(
+                    f"Setting new setpoint {self.setpoints[self.idx_setpoint]}"
+                )
                 self.set_setpoint(self.setpoints[self.idx_setpoint])
                 self.idx_setpoint += 1
                 self.path_status = PathStatus.WAITING
@@ -120,12 +150,13 @@ class PathSetter:
         rospy.loginfo("Challenge completed")
         self.pub_fruit_count.publish(42)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     SETPOINTS = [
-    [1, 5, 2, 0, 0, np.pi/2],
-    [10, 6, 5, 0, 0, -np.pi/2],
-    [10, 10, 3, 0, 0, 0],
-    [0, 0, 1, 0, 0, np.pi]
+        [1, 5, 2, 0, 0, np.pi / 2],
+        [10, 6, 5, 0, 0, -np.pi / 2],
+        [10, 10, 3, 0, 0, 0],
+        [1, 1, 1, 0, 0, np.pi],
     ]
     path_setter = PathSetter()
     for setpoint in SETPOINTS:
@@ -133,14 +164,3 @@ if __name__ == '__main__':
 
     path_setter.wait_for_challenge_start()
     path_setter.run()
-
-        
-
-
-
-    
-
-
-
-
-

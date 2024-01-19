@@ -8,8 +8,8 @@ windows:
       layout:
       panes:
         - roscore
-        - export SITL_RITW_TERMINAL="tmux new-window -d -n:ardupilot1"; waitForRos; 
-          roslaunch ardupilot_gazebo sim_vehicle.launch 
+        - export SITL_RITW_TERMINAL="tmux new-window -d -n:ardupilot1"; waitForRos;
+          roslaunch ardupilot_gazebo sim_vehicle.launch
           enable_console:=false
           additional_arguments:="--no-rebuild"
         - |
@@ -21,9 +21,9 @@ windows:
   - gazebo:
       layout: tiled
       panes:
-        - waitForRos; roslaunch ardupilot_gazebo kopterworx.launch 
+        - waitForRos; roslaunch ardupilot_gazebo kopterworx.launch
           use_sim_time:=true
-          x:=1.5 y:=1.5
+          x:=1 y:=1
           world:=$(rospack find icuas24_competition)/worlds/well_lit.world
         - |
           waitForRos
@@ -79,7 +79,7 @@ windows:
   - arm&takeof:
       layout: tiled
       panes:
-        - waitForRos; roslaunch uav_ros_control pid_carrot.launch 
+        - waitForRos; roslaunch uav_ros_control pid_carrot.launch
           msf_callback_enable:=true
           odometry:=odometry
           control_type:=pid_cascade_node_yawrate
@@ -94,12 +94,14 @@ windows:
   - trajectory:
       layout: tiled
       panes:
-        - waitForRos; roslaunch uav_ros_tracker topp_tracker.launch 
+        - waitForRos; roslaunch uav_ros_tracker topp_tracker.launch
           tracker_config:=custom_config/topp_config_custom.yaml
   - avader_controller:
       layout: tiled
       panes:
-        - waitForRos; rosrun avader_src path_setter.py
+        - waitForRos; rosrun icuas24_competition path_setter.py
+        - |
+          waitForRos; rostopic echo /fruit_count
   - topics_listener:
       layout: tiled
       panes:

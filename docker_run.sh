@@ -2,8 +2,6 @@
 
 XSOCK=/tmp/.X11-unix
 XAUTH=/tmp/.docker.xauth
-SRC_LOCAL=${PWD}/avader_src/
-SRC_DOCKER=/root/sim_ws/src/avader_src/
 touch $XAUTH
 xauth nlist $DISPLAY | sed -e 's/^..../ffff/' | xauth -f $XAUTH nmerge -
 
@@ -65,8 +63,6 @@ docker run \
   --privileged \
   --volume=$XSOCK:$XSOCK:rw \
   --volume=$XAUTH:$XAUTH:rw \
-  --volume=$SRC_LOCAL:$SRC_DOCKER:Z \
-  --volume=${PWD}/startup/challenge:/root/sim_ws/src/icuas24_competition/startup/challenge:Z \
   --env="XAUTHORITY=${XAUTH}" \
   --env DISPLAY=$DISPLAY \
   --env TERM=xterm-256color \
