@@ -1,5 +1,10 @@
 #!/usr/bin/env python
 
+import os
+import sys
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(BASE_DIR)
+
 import rospy
 from std_msgs.msg import Bool, String, Int32
 from geometry_msgs.msg import PoseStamped
@@ -8,7 +13,8 @@ import numpy as np
 from dataclasses import dataclass
 from enum import Enum
 from typing import List
-
+from scripts import A_star
+#from A_star import *
 
 class PlantType(Enum):
     PEPPER = "PEPPER"
@@ -51,7 +57,7 @@ class PathSetter:
         rospy.loginfo("avader_uav node started")
 
         self.challenge_started = False
-        self.plant_beds: PlantBed | None = None
+        self.plant_beds: PlantBed = None
         self.tracker_status = TrackerStatus.OFF
         self.idx_setpoint = 0
         self.path_status = PathStatus.REACHED
@@ -158,6 +164,10 @@ if __name__ == "__main__":
         [10, 10, 3, 0, 0, 0],
         [1, 1, 1, 0, 0, np.pi],
     ]
+
+    AREAS_FROM_DRONE = [5,15,18,20]
+    SETPOINTS = A_star.start(AREAS_FROM_DRONE)
+    
     path_setter = PathSetter()
     for setpoint in SETPOINTS:
         path_setter.add_setpoint(Setpoint(*setpoint))
