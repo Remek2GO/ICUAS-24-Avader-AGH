@@ -158,19 +158,12 @@ class PathSetter:
 
 
 if __name__ == "__main__":
-    SETPOINTS = [
-        [1, 5, 2, 0, 0, np.pi / 2],
-        [10, 6, 5, 0, 0, -np.pi / 2],
-        [10, 10, 3, 0, 0, 0],
-        [1, 1, 1, 0, 0, np.pi],
-    ]
-
-    AREAS_FROM_DRONE = [5,15,18,20]
-    SETPOINTS = A_star.start(AREAS_FROM_DRONE)
-    
     path_setter = PathSetter()
+    path_setter.wait_for_challenge_start()
+
+    SETPOINTS = A_star.start(path_setter.plant_beds.bed_ids)
+    
     for setpoint in SETPOINTS:
         path_setter.add_setpoint(Setpoint(*setpoint))
 
-    path_setter.wait_for_challenge_start()
     path_setter.run()
