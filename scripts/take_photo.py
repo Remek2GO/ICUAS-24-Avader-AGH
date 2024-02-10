@@ -36,6 +36,7 @@ class Photo:
                 time = msg.header.stamp
                 cv2.imwrite(''+str(time)+'_color.png', cv2_img_color)
                 self.color_taken = True
+                rospy.loginfo("Image saved as "+str(time)+"_color.png")
                 #rospy.signal_shutdown("Image saved")
                 #rospy.sleep(1)
 
@@ -55,7 +56,8 @@ class Photo:
                 # Save your OpenCV2 image as a jpeg 
                 time = msg.header.stamp
                 cv2.imwrite(''+str(time)+'_depth.png', cv2_img_depth)
-                depth_taken = True
+                self.depth_taken = True
+                rospy.loginfo("Image saved as "+str(time)+"_depth.png")
                 #rospy.signal_shutdown("Image saved")
                 #rospy.sleep(1)
 

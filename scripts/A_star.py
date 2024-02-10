@@ -114,9 +114,9 @@ class A_star:
                     point_copy = copy.deepcopy(point)
                     previous_point_copy[5] = np.pi/2
                     if abs(previous_point[1] - 25) > abs(previous_point[1] - 2):
-                        previous_point_copy[1] = 25
-                    else:
                         previous_point_copy[1] = 2
+                    else:
+                        previous_point_copy[1] = 25
                     new_path.append(previous_point_copy)
                     previous_point_copy_copy = copy.copy(previous_point_copy)
                     previous_point_copy_copy[2] = copy.copy(point_copy[2])

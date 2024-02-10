@@ -7,8 +7,9 @@ sys.path.append(BASE_DIR)
 
 import rospy
 from std_msgs.msg import Bool, String, Int32
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Transform
 from tf.transformations import quaternion_from_euler
+from trajectory_msgs.msg import MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
 import numpy as np
 from dataclasses import dataclass
 from enum import Enum
@@ -67,6 +68,10 @@ class PathSetter:
             "/red/tracker/input_pose", PoseStamped, queue_size=10
         )
         self.pub_fruit_count = rospy.Publisher("/fruit_count", Int32, queue_size=10)
+        self.pub_trajectory = rospy.Publisher(
+            "/red/tracker/input_trajectory", MultiDOFJointTrajectory, queue_size=10
+        )
+
         self.sub_challenge_started = rospy.Subscriber(
             "/red/challenge_started", Bool, self.set_challenge_started
         )
@@ -152,18 +157,52 @@ class PathSetter:
 
             self.rate.sleep()
 
+    def send_trajectory(self):
+        trajectory = MultiDOFJointTrajectory()
+        trajectory.header.stamp = rospy.Time.now()
+        trajectory.header.frame_id = "world"
+
+        for setpoint in self.setpoints:
+            point = MultiDOFJointTrajectoryPoint()
+            point.transforms = []
+            transform = Transform()
+            transform.translation.x = setpoint.x
+            transform.translation.y = setpoint.y
+            transform.translation.z = setpoint.z
+            x, y, z, w = quaternion_from_euler(setpoint.roll, setpoint.pitch, setpoint.yaw)
+            transform.rotation.x = x
+            transform.rotation.y = y
+            transform.rotation.z = z
+            transform.rotation.w = w
+            
+            point.transforms.append(transform)
+            trajectory.points.append(point)
+        
+        self.pub_trajectory.publish(trajectory)
+
     def handle_challenge_completed(self):
         rospy.loginfo("Challenge completed")
         self.pub_fruit_count.publish(42)
 
+MANUAL = False
 
 if __name__ == "__main__":
     path_setter = PathSetter()
     path_setter.wait_for_challenge_start()
 
-    SETPOINTS = A_star.start(path_setter.plant_beds.bed_ids)
+    if MANUAL:
+        x = input("X:")
+        y = input("Y:")
+        z = input("Z:")
+        roll = input("Roll:")
+        pitch = input("Pitch:")
+        yaw = input("Yaw:")
+        path_setter.add_setpoint(Setpoint(float(x), float(y), float(z), float(roll), float(pitch), float(yaw)))
+    else:
+        SETPOINTS = A_star.start(path_setter.plant_beds.bed_ids)
     
-    for setpoint in SETPOINTS:
-        path_setter.add_setpoint(Setpoint(*setpoint))
+        for setpoint in SETPOINTS:
+            path_setter.add_setpoint(Setpoint(*setpoint))
 
-    path_setter.run()
+    path_setter.send_trajectory()
+    #path_setter.run()
