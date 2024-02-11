@@ -15,7 +15,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List
 from scripts.utils import A_star
-from scripts.photo_taker import PhotoTaker
 from scripts.utils.types import PlantType, TrackerStatus, PathStatus, Setpoint, PlantBed
 
 
@@ -170,8 +169,7 @@ if __name__ == "__main__":
         yaw = input("Yaw:")
         path_setter.add_setpoint(Setpoint(float(x), float(y), float(z), float(roll), float(pitch), float(yaw)))
     else:
-        SETPOINTS = A_star.start(path_setter.plant_beds.bed_ids)
-        photo_taker = PhotoTaker(path_setter.plant_beds.bed_ids)        
+        SETPOINTS = A_star.start(path_setter.plant_beds.bed_ids)      
     
         for setpoint in SETPOINTS:
             path_setter.add_setpoint(Setpoint(*setpoint))

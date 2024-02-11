@@ -99,9 +99,7 @@ windows:
   - avader_controller:
       layout: tiled
       panes:
-        - waitForRos; rosrun icuas24_competition path_setter.py
-        - |
-          waitForRos; rostopic echo /fruit_count
+        - waitForRos; roslaunch icuas24_competition challenge.launch
   - topics_listener:
       layout: tiled
       panes:

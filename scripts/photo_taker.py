@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+import os
+import sys
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(BASE_DIR)
 
 import rospy
 import numpy as np
@@ -37,13 +41,14 @@ class PhotoTaker:
         self.color_counter = 0
         self.depth_counter = 0
 
-        rospy.Subscriber(self.image_topic_depth, Image, self.image_callback_depth)
-        rospy.Subscriber(self.image_topic_color, Image, self.image_callback_color)
-        rospy.Subscriber(self.odom_topic, Odometry, self.odom_callback)
         rospy.Subscriber(self.plant_beds_topic, String, self.plants_beds_callback)
         self.pub_image_taken = rospy.Publisher(self.image_for_analysis_topic, ImageForAnalysis, queue_size=10)
 
     def plants_beds_callback(self, msg: String):
+        rospy.Subscriber(self.image_topic_depth, Image, self.image_callback_depth)
+        rospy.Subscriber(self.image_topic_color, Image, self.image_callback_color)
+        rospy.Subscriber(self.odom_topic, Odometry, self.odom_callback)
+
         bed_ids = [int(bed_id) for bed_id in msg.data.split(" ")[1:]]
         self.set_bed_ids(bed_ids)
 
@@ -53,7 +58,7 @@ class PhotoTaker:
         self.successful_shots = np.zeros((len(bed_ids), 2, 2), dtype=np.uint8)
 
     def image_callback_color(self, msg):
-        if self.current_position_id != (-1, -1) and self.successful_shots[self.bed_id_to_id[self.current_position_id[0]], self.current_position_id[1], 0] < MAX_IMAGES:
+        if not -1 in self.current_position_id and self.successful_shots[self.bed_id_to_id[self.current_position_id[0]], self.current_position_id[1], 0] < MAX_IMAGES:
             self.color_counter += 1
             if self.color_counter%FRAMES_TO_SKIP == 1:
                 try:
@@ -73,7 +78,7 @@ class PhotoTaker:
             self.color_counter = 0
 
     def image_callback_depth(self, msg):
-        if self.current_position_id != (-1, -1) and self.successful_shots[self.bed_id_to_id[self.current_position_id[0]], self.current_position_id[1], 1] < MAX_IMAGES:
+        if not -1 in self.current_position_id and self.successful_shots[self.bed_id_to_id[self.current_position_id[0]], self.current_position_id[1], 1] < MAX_IMAGES:
             self.depth_counter += 1
             if self.depth_counter%FRAMES_TO_SKIP == 1:
                 try:
@@ -135,7 +140,7 @@ if __name__ == "__main__":
     rospy.loginfo('photo_taker node started')
 
     photo_taker = PhotoTaker()
-    rospy.spin()
+    photo_taker.run()
 
 
 
