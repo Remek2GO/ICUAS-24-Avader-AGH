@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List
 from scripts import A_star
+from scripts.photo_taker import PhotoTaker
 #from A_star import *
 
 class PlantType(Enum):
@@ -200,9 +201,11 @@ if __name__ == "__main__":
         path_setter.add_setpoint(Setpoint(float(x), float(y), float(z), float(roll), float(pitch), float(yaw)))
     else:
         SETPOINTS = A_star.start(path_setter.plant_beds.bed_ids)
+        photo_taker = PhotoTaker(path_setter.plant_beds.bed_ids)        
     
         for setpoint in SETPOINTS:
             path_setter.add_setpoint(Setpoint(*setpoint))
 
     path_setter.send_trajectory()
+    rospy.spin()
     #path_setter.run()
