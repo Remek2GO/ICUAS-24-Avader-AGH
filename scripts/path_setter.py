@@ -186,6 +186,7 @@ class PathSetter:
         self.pub_fruit_count.publish(42)
 
 MANUAL = False
+# MANUAL = True
 
 if __name__ == "__main__":
     path_setter = PathSetter()
