@@ -6,7 +6,7 @@ from sensor_msgs.msg import Image
 from nav_msgs.msg import Odometry
 from cv_bridge import CvBridge, CvBridgeError
 import cv2
-from scripts import positions
+from scripts.utils import positions
 from tf.transformations import euler_from_quaternion
 from typing import List, Tuple
 import json

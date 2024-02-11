@@ -2,7 +2,7 @@
 
 import numpy as np
 from dataclasses import dataclass
-from scripts import positions
+from scripts.utils import positions
 import copy
 
 @dataclass

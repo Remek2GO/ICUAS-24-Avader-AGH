@@ -14,7 +14,7 @@ import numpy as np
 from dataclasses import dataclass
 from enum import Enum
 from typing import List
-from scripts import A_star
+from scripts.utils import A_star
 from scripts.photo_taker import PhotoTaker
 #from A_star import *
 
