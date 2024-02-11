@@ -2,6 +2,7 @@
 
 import rospy
 import numpy as np
+from std_msgs.msg import String
 from sensor_msgs.msg import Image
 from nav_msgs.msg import Odometry
 from cv_bridge import CvBridge, CvBridgeError
@@ -9,7 +10,7 @@ import cv2
 from scripts.utils import positions
 from tf.transformations import euler_from_quaternion
 from typing import List, Tuple
-import json
+from icuas24_competition.msg import ImageForAnalysis
 
 
 bridge = CvBridge()
@@ -21,15 +22,16 @@ MAX_IMAGES = 5
 FRAMES_TO_SKIP = 10
 
 class PhotoTaker:
-    def __init__(self, bed_ids: List[int]) -> None:
+    def __init__(self):
         self.image_topic_depth = "/red/camera/depth/image_raw"
         self.image_topic_color = "/red/camera/color/image_raw"
         self.odom_topic = "/red/odometry"
-        self.current_odom: Odometry = None
+        self.plant_beds_topic = "/red/plants_beds"
+        self.image_for_analysis_topic = "/image_for_analysis"
 
-        self.bed_ids = bed_ids
-        self.bed_id_to_id = {bed_id: i for i, bed_id in enumerate(bed_ids)}
-        self.successful_shots = np.zeros((len(bed_ids), 2, 2))
+        self.current_odom: Odometry = None
+        self.current_color_path: str = None
+        self.current_depth_path: str = None
         self.current_position_id = (-1, -1)
 
         self.color_counter = 0
@@ -38,6 +40,17 @@ class PhotoTaker:
         rospy.Subscriber(self.image_topic_depth, Image, self.image_callback_depth)
         rospy.Subscriber(self.image_topic_color, Image, self.image_callback_color)
         rospy.Subscriber(self.odom_topic, Odometry, self.odom_callback)
+        rospy.Subscriber(self.plant_beds_topic, String, self.plants_beds_callback)
+        self.pub_image_taken = rospy.Publisher(self.image_for_analysis_topic, ImageForAnalysis, queue_size=10)
+
+    def plants_beds_callback(self, msg: String):
+        bed_ids = [int(bed_id) for bed_id in msg.data.split(" ")[1:]]
+        self.set_bed_ids(bed_ids)
+
+    def set_bed_ids(self, bed_ids: List[int]):
+        self.bed_ids = bed_ids
+        self.bed_id_to_id = {bed_id: i for i, bed_id in enumerate(bed_ids)}
+        self.successful_shots = np.zeros((len(bed_ids), 2, 2), dtype=np.uint8)
 
     def image_callback_color(self, msg):
         if self.current_position_id != (-1, -1) and self.successful_shots[self.bed_id_to_id[self.current_position_id[0]], self.current_position_id[1], 0] < MAX_IMAGES:
@@ -48,14 +61,13 @@ class PhotoTaker:
                 except CvBridgeError:
                     rospy.logwarn('Error converting color image')
                 else:
-                    path = f'{IMAGES_FOLDER_PATH}/{self.current_position_id[0]}{self.current_position_id[1]}{self.successful_shots[self.bed_id_to_id[self.current_position_id[0]], self.current_position_id[1], 0]}'
+                    unique_id = f"{self.current_position_id[0]}{self.current_position_id[1]}{self.successful_shots[self.bed_id_to_id[self.current_position_id[0]], self.current_position_id[1], 0]}"
+                    path = f'{IMAGES_FOLDER_PATH}/{unique_id}'
+
                     cv2.imwrite(f"{path}_color.png", cv2_img_color)
                     self.successful_shots[self.bed_id_to_id[self.current_position_id[0]], self.current_position_id[1], 0] += 1
                     
-                    with open(f"{path}_odom.json", "w") as f:
-                        odom_ = self.odom_to_json(self.current_odom)
-                        f.write(odom_)
-                    
+                    self.current_color_path = f"{path}_color.png"
                     rospy.loginfo(f'Image saved as {path}_color.png')
         else:
             self.color_counter = 0
@@ -73,10 +85,7 @@ class PhotoTaker:
                     cv2.imwrite(f"{path}_depth.png", cv2_img_depth)
                     self.successful_shots[self.bed_id_to_id[self.current_position_id[0]], self.current_position_id[1], 1] += 1
 
-                    with open(f"{path}_dep_odom.json", "w") as f:
-                        odom_ = self.odom_to_json(self.current_odom)
-                        f.write(odom_)
-
+                    self.current_depth_path = f"{path}_depth.png"
                     rospy.loginfo(f'Image saved as {path}_depth.png')
         else:
             self.depth_counter = 0
@@ -104,23 +113,29 @@ class PhotoTaker:
         return np.linalg.norm(np.array(odom_position[:3]) - np.array(poi_position[:3])) < PROXIMITY_THRESHOLD and \
                 (np.abs(odom_position[-1]-poi_position[-1]) < YAW_THRESHOLD or np.abs(odom_position[-1]-poi_position[-1]) > 2*np.pi-YAW_THRESHOLD)
     
-    def odom_to_json(self, odom_msg: Odometry) -> str:
-        roll, pitch, yaw = euler_from_quaternion([odom_msg.pose.pose.orientation.x, 
-                                    odom_msg.pose.pose.orientation.y, 
-                                    odom_msg.pose.pose.orientation.z, 
-                                    odom_msg.pose.pose.orientation.w])
-        return json.dumps({
-            "position": {
-                "x": odom_msg.pose.pose.position.x,
-                "y": odom_msg.pose.pose.position.y,
-                "z": odom_msg.pose.pose.position.z,
-            },
-            "orientation": {
-                "roll": roll,
-                "pitch": pitch,
-                "yaw": yaw,
-            },
-        })
+    def run(self):
+        while not rospy.is_shutdown():
+            if self.current_color_path is not None and self.current_depth_path is not None:
+                msg = ImageForAnalysis()
+                msg.img_path_color = self.current_color_path
+                msg.img_path_depth = self.current_depth_path
+                msg.bed_id = np.uint8(self.current_position_id[0])
+                msg.bed_side = np.uint8(self.current_position_id[1])
+                msg.img_id = int(self.successful_shots[self.bed_id_to_id[self.current_position_id[0]], self.current_position_id[1], 0])
+                msg.pose = self.current_odom.pose.pose
+
+                self.pub_image_taken.publish(msg)
+                self.current_color_path = None
+                self.current_depth_path = None
+            rospy.sleep(0.01)
+    
+
+if __name__ == "__main__":
+    rospy.init_node('photo_taker')
+    rospy.loginfo('photo_taker node started')
+
+    photo_taker = PhotoTaker()
+    rospy.spin()
 
 
 

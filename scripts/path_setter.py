@@ -16,48 +16,11 @@ from enum import Enum
 from typing import List
 from scripts.utils import A_star
 from scripts.photo_taker import PhotoTaker
-#from A_star import *
-
-class PlantType(Enum):
-    PEPPER = "PEPPER"
-    TOMATO = "TOMATO"
-    EGGPLANT = "EGGPLANT"
-
-
-class TrackerStatus(Enum):
-    OFF = "OFF"
-    ACTIVE = "ACTIVE"
-    ACCEPT = "ACCEPT"
-
-
-class PathStatus(Enum):
-    REACHED = 0
-    PROGRESS = 1
-    COMPLETED = 2
-    WAITING = 3
-
-
-@dataclass
-class Setpoint:
-    x: float
-    y: float
-    z: float
-    roll: float
-    pitch: float
-    yaw: float
-
-
-@dataclass
-class PlantBed:
-    plant_type: PlantType
-    bed_ids: List[int]
+from scripts.utils.types import PlantType, TrackerStatus, PathStatus, Setpoint, PlantBed
 
 
 class PathSetter:
     def __init__(self) -> None:
-        rospy.init_node("avader_uav", anonymous=True)
-        rospy.loginfo("avader_uav node started")
-
         self.challenge_started = False
         self.plant_beds: PlantBed = None
         self.tracker_status = TrackerStatus.OFF
@@ -188,7 +151,13 @@ class PathSetter:
 MANUAL = False
 # MANUAL = True
 
+USE_POINTS = True
+# USE_POINTS = False
+
 if __name__ == "__main__":
+    rospy.init_node("path_setter", anonymous=True)
+    rospy.loginfo("path_setter node started")
+
     path_setter = PathSetter()
     path_setter.wait_for_challenge_start()
 
@@ -207,6 +176,9 @@ if __name__ == "__main__":
         for setpoint in SETPOINTS:
             path_setter.add_setpoint(Setpoint(*setpoint))
 
-    path_setter.send_trajectory()
+    if USE_POINTS:
+        path_setter.run()
+    else:
+        path_setter.send_trajectory()
+
     rospy.spin()
-    #path_setter.run()
