@@ -35,7 +35,8 @@ class PathSetter:
         self.pub_trajectory = rospy.Publisher(
             "/red/tracker/input_trajectory", MultiDOFJointTrajectory, queue_size=10
         )
-
+        self.pub_take_photo = rospy.Publisher("/take_photo", Bool, queue_size=10)
+        
         self.sub_challenge_started = rospy.Subscriber(
             "/red/challenge_started", Bool, self.set_challenge_started
         )
@@ -116,7 +117,8 @@ class PathSetter:
                 and self.tracker_status == TrackerStatus.ACCEPT
             ):
                 self.path_status = PathStatus.REACHED
-                rospy.loginfo("Setpoint reached")
+                self.pub_take_photo.publish(Bool(True))
+                # rospy.loginfo("Setpoint reached")
             elif self.path_status == PathStatus.REACHED:
                 rospy.loginfo(
                     f"Setting new setpoint {self.setpoints[self.idx_setpoint]}"

@@ -8,7 +8,7 @@ sys.path.append(BASE_DIR)
 
 import rospy
 from icuas24_competition.msg import ImageForAnalysis
-from std_msgs.msg import Int32
+from std_msgs.msg import Int32, String
 from typing import List, Dict, Tuple
 from scripts.utils.plant_bed import PlantBed, Plant, PlantSide
 from scripts.utils.types import PlantType
@@ -22,16 +22,26 @@ class ImageAnalyzer:
 
         self.analysis_queue: List[ImageForAnalysis] = []
         self.plant_beds: Dict[int, PlantBed] = {}
+        self.fruit_type: PlantType = None
 
         self.image_sub = rospy.Subscriber(self.image_topic, ImageForAnalysis, self.image_callback)
         self.current_fruit_count_pub = rospy.Publisher("/current_fruit_count", Int32, queue_size=10)
+        
+        self.sub_plants_beds = rospy.Subscriber(
+            "/red/plants_beds", String, self.set_fruit_type
+        )
+        
+    def set_fruit_type(self, data: String):
+        type = data.data.split(" ")[0]
+        
+        self.fruit_type = PlantType(type.upper())
 
     def image_callback(self, msg: ImageForAnalysis):
-        rospy.loginfo(f"Received image for analysis: {msg.img_path_color}")
+        # rospy.loginfo(f"Received image for analysis: {msg.img_path_color}")
         self.analysis_queue.append(msg)
 
     def analyze_image(self, image_for_analysis: ImageForAnalysis):
-        if image_for_analysis.img_id == 1:
+        if image_for_analysis.img_id == 10:
             I = cv2.imread(image_for_analysis.img_path_color)
             D = cv2.imread(image_for_analysis.img_path_depth)
             
@@ -48,25 +58,28 @@ class ImageAnalyzer:
                 self.plant_beds[image_for_analysis.bed_id] = PlantBed()
                 
             for i, plant_side in enumerate(plant_sides):
-                self.plant_beds[image_for_analysis.bed_id].set_plant(i, image_for_analysis.bed_side, plant_side.fruit_count, plant_side.fruit_position, plant_type)
+                idx = i if image_for_analysis.bed_side == 0 else len(plant_sides) - i - 1
+                self.plant_beds[image_for_analysis.bed_id].set_plant(idx, image_for_analysis.bed_side, plant_side.fruit_count, plant_side.fruit_position, plant_type)
                 
-            rospy.loginfo(f"Plant bed {image_for_analysis.bed_id} updated")
+            # rospy.loginfo(f"Plant bed {image_for_analysis.bed_id} updated")
+            rospy.loginfo(f"Bed #{image_for_analysis.bed_id} side {image_for_analysis.bed_side} found {sum([side.fruit_count for side in plant_sides])} {plant_type.value} fruits")
+            rospy.loginfo(f"Current fruit count: {self.get_fruit_count()}")
+            
             
     def get_fruit_count(self) -> int:
-        return sum(self.plant_beds[bed_id].get_bed_fruit_count() for bed_id in self.plant_beds.keys())  
+        return sum(self.plant_beds[bed_id].get_bed_fruit_count(self.fruit_type) for bed_id in self.plant_beds.keys())  
     
     def run(self):
         rate = rospy.Rate(100)
         while not rospy.is_shutdown():
             if len(self.analysis_queue) > 0:
                 image_for_analysis = self.analysis_queue.pop(0)
-                rospy.loginfo(f"Analyzing image: {image_for_analysis.img_path_color}")
+                # rospy.loginfo(f"Analyzing image: {image_for_analysis.img_path_color}")
 
                 self.analyze_image(image_for_analysis)
 
                 current_fruit_count = self.get_fruit_count()
                 self.current_fruit_count_pub.publish(current_fruit_count)
-                rospy.loginfo(f"Current fruit count: {self.get_fruit_count()}")
             rate.sleep()
 
 if __name__ == "__main__":

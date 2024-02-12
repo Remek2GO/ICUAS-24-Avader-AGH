@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from .plant_bed import PlantSide
+from .types import PlantType
 from typing import List, Tuple
 
 # TODO - doczytac jak maja wygladac te owoce i czy sa jakies ograniczenia.
@@ -178,17 +179,34 @@ def process_frame(I, D) -> Tuple[List[PlantSide], int]:
         # cv2.imshow("Patch", patch)
         # cv2.waitKey(0)
         count, type, centers = process_patch(patch)
-        plant_side = PlantSide(fruit_count=count, fruit_position=centers)
+        plant_type = None
+        if type == 0:
+            plant_type = PlantType.TOMATO
+        elif type == 1:
+            plant_type = PlantType.EGGPLANT
+        elif type == 2:
+            plant_type = PlantType.PEPPER
+        plant_side = PlantSide(fruit_count=count, fruit_position=centers, fruit_type=plant_type)
+        
+        
+        if (count > 0):
+            text = f"{count} {fruite_type[type]}"
+            cv2.putText(I, text, (p[2], p[0] + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0,0,255), 2)
+        
+        cv2.rectangle(I, (p[2], p[0]), (p[3], p[1]), 255, 2)
         
         plant_sides.append(plant_side)
         print(count, " ", fruite_type[type], " ")
+        
+    
+    cv2.imshow("Detection results", I)
+    cv2.startWindowThread()
+    # cv2.waitKey(0)
         
     return plant_sides, type    
 
 
 #   # Wizualizacja
-#   cv2.imshow("Detection results", I)
-#   cv2.waitKey(0)
 
 
 if __name__ == "__main__":

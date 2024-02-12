@@ -6,6 +6,7 @@ from dataclasses import dataclass
 class PlantSide:
     fruit_count: int
     fruit_position: np.ndarray # fruit_count X 2 array of x, y coordinates normalized to [0, 1]
+    fruit_type: PlantType = None
 
 class Plant:
     def __init__(self):
@@ -55,8 +56,8 @@ class PlantBed:
         else:
             self.plants[index].set_right(fruit_count, fruit_position)
 
-    def get_bed_fruit_count(self) -> int:
-        return sum(plant.get_real_fruit_count() for plant in self.plants)
+    def get_bed_fruit_count(self, type: PlantType) -> int:
+        return sum(plant.get_real_fruit_count() for plant in self.plants if plant.plant_type == type)
 
 
         
