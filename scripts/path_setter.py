@@ -26,6 +26,7 @@ class PathSetter:
         self.idx_setpoint = 0
         self.path_status = PathStatus.REACHED
         self.rate = rospy.Rate(20)
+        self.current_fruit_count = 0
 
         self.pub_pose = rospy.Publisher(
             "/red/tracker/input_pose", PoseStamped, queue_size=10
@@ -44,6 +45,9 @@ class PathSetter:
         self.sub_tracker_status = rospy.Subscriber(
             "/red/tracker/status", String, self.check_tracker_status
         )
+        self.sub_current_fruit_count = rospy.Subscriber(
+            "/current_fruit_count", Int32, self.set_current_fruit_count
+        )
 
         self.setpoints: List[Setpoint] = []
 
@@ -60,6 +64,9 @@ class PathSetter:
 
     def check_tracker_status(self, data: String):
         self.tracker_status = TrackerStatus(data.data)
+        
+    def set_current_fruit_count(self, data: Int32):
+        self.current_fruit_count = data.data
 
     def set_setpoint(self, setpoint: Setpoint):
         msg = PoseStamped()
@@ -145,7 +152,7 @@ class PathSetter:
 
     def handle_challenge_completed(self):
         rospy.loginfo("Challenge completed")
-        self.pub_fruit_count.publish(42)
+        self.pub_fruit_count.publish(self.current_fruit_count)
 
 MANUAL = False
 # MANUAL = True

@@ -3,5 +3,7 @@
 <launch>
     <node name="path_setter" pkg="icuas24_competition" type="path_setter.py" output="screen"/>
 
-    <node name="photo_taker" pkg="icuas24_competition" type="photo_taker.py" output="screen"/>    
+    <node name="photo_taker" pkg="icuas24_competition" type="photo_taker.py" output="screen"/> 
+
+    <node name="image_analyzer" pkg="icuas24_competition" type="image_analyzer.py" output="screen"/>
 </launch>

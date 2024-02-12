@@ -165,6 +165,7 @@ include_directories(
 catkin_install_python(PROGRAMS
   scripts/path_setter.py
   scripts/photo_taker.py
+  scripts/image_analyzer.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

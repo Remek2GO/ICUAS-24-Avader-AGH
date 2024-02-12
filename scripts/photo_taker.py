@@ -37,6 +37,7 @@ class PhotoTaker:
         self.current_color_path: str = None
         self.current_depth_path: str = None
         self.current_position_id = (-1, -1)
+        self.last_position_id = (-1, -1)
 
         self.color_counter = 0
         self.depth_counter = 0
@@ -101,6 +102,7 @@ class PhotoTaker:
             for position_id in range(2):
                 if self.is_close_to_position(msg, (bed_id, position_id)):
                     self.current_position_id = (bed_id, position_id)
+                    self.last_position_id = self.current_position_id
                     return
         self.current_position_id = (-1, -1)
             
@@ -124,9 +126,9 @@ class PhotoTaker:
                 msg = ImageForAnalysis()
                 msg.img_path_color = self.current_color_path
                 msg.img_path_depth = self.current_depth_path
-                msg.bed_id = np.uint8(self.current_position_id[0])
-                msg.bed_side = np.uint8(self.current_position_id[1])
-                msg.img_id = int(self.successful_shots[self.bed_id_to_id[self.current_position_id[0]], self.current_position_id[1], 0])
+                msg.bed_id = np.uint8(self.last_position_id[0])
+                msg.bed_side = np.uint8(self.last_position_id[1])
+                msg.img_id = int(self.successful_shots[self.bed_id_to_id[self.last_position_id[0]], self.last_position_id[1], 0])
                 msg.pose = self.current_odom.pose.pose
 
                 self.pub_image_taken.publish(msg)
