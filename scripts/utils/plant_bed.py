@@ -1,6 +1,7 @@
 import numpy as np
 from .types import PlantType
 from dataclasses import dataclass
+from copy import deepcopy
 
 @dataclass
 class PlantSide:
@@ -18,10 +19,10 @@ class Plant:
         self.plant_type = plant_type
 
     def set_left(self, fruit_count: int, fruit_position: np.ndarray):
-        self.left = PlantSide(fruit_count, fruit_position)
+        self.left = PlantSide(fruit_count, deepcopy(fruit_position))
 
     def set_right(self, fruit_count: int, fruit_position: np.ndarray):
-        self.right = PlantSide(fruit_count, fruit_position)
+        self.right = PlantSide(fruit_count, deepcopy(fruit_position))
 
     def get_real_fruit_count(self) -> int:
         if self.left is None and self.right is None:
@@ -32,7 +33,7 @@ class Plant:
             return self.left.fruit_count
             
                 
-        reversed_right_position = self.right.fruit_position
+        reversed_right_position = deepcopy(self.right.fruit_position)
         reversed_right_position[:, 0] = 1 - reversed_right_position[:, 0]
 
         duplicate_count = 0

@@ -20,7 +20,7 @@ from icuas24_competition.msg import ImageForAnalysis
 bridge = CvBridge()
 
 IMAGES_FOLDER_PATH = "/root/sim_ws/src/icuas24_competition/images"
-PROXIMITY_THRESHOLD = 0.3
+PROXIMITY_THRESHOLD = 0.5
 YAW_THRESHOLD = np.pi/8
 MAX_IMAGES = 5
 FRAMES_TO_SKIP = 10

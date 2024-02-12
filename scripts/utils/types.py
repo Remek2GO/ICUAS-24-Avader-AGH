@@ -6,6 +6,8 @@ class PlantType(Enum):
     PEPPER = "PEPPER"
     TOMATO = "TOMATO"
     EGGPLANT = "EGGPLANT"
+    def __str__(self):
+        return self.value
 
 
 class TrackerStatus(Enum):

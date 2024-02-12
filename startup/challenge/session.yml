@@ -25,11 +25,6 @@ windows:
           use_sim_time:=true
           x:=1 y:=1
           world:=$(rospack find icuas24_competition)/worlds/well_lit.world
-        - |
-          waitForRos
-          waitForSimulation
-          sleep 2
-          rostopic pub --latch /$UAV_NAMESPACE/plants_beds std_msgs/String "Pepper 10 11 14 21 23 24"
         - waitForRos; waitForSimulation; roslaunch icuas24_competition spawn_greenhouse_world.launch
         - |
           waitForRos

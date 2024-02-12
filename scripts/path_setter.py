@@ -117,6 +117,7 @@ class PathSetter:
                 and self.tracker_status == TrackerStatus.ACCEPT
             ):
                 self.path_status = PathStatus.REACHED
+                rospy.sleep(1)
                 self.pub_take_photo.publish(Bool(True))
                 # rospy.loginfo("Setpoint reached")
             elif self.path_status == PathStatus.REACHED:
