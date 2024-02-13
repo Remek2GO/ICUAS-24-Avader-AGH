@@ -146,7 +146,7 @@ def get_patches(masked_result):
 
 # Przetwarzanie pojedycznej ramki
 # obraz RGB i odpowiadajaca mapa glebi
-def process_frame(I, D) -> Tuple[List[PlantSide], int]:
+def process_frame(I, D, debug=False) -> Tuple[List[PlantSide], int]:
 
     # Maska smigla
     I = preprocess_color_image(I)
@@ -199,14 +199,12 @@ def process_frame(I, D) -> Tuple[List[PlantSide], int]:
         print(count, " ", fruite_type[type], " ")
         
     
-    cv2.imshow("Detection results", I)
-    cv2.startWindowThread()
-    # cv2.waitKey(0)
+    if (debug):
+        cv2.imshow("Detection results", I)
+        cv2.startWindowThread()
+        cv2.waitKey(0)
         
-    return plant_sides, type    
-
-
-#   # Wizualizacja
+    return plant_sides, type   
 
 
 if __name__ == "__main__":
