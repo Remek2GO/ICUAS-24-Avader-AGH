@@ -34,14 +34,13 @@ class Plant:
         elif self.right is None:
             return self.left.fruit_count
             
-        # Tutaj jest eliminacja duplikatow 
-
-        #reversed_right_position = deepcopy(self.right.fruit_position)
-        #reversed_right_position[:, 0] = 1 - reversed_right_position[:, 0]
+                
+        reversed_right_position = deepcopy(self.right.fruit_position)
+        reversed_right_position[:, 1] = 1 - reversed_right_position[:, 1]
 
         duplicate_count = 0
 
-        #for left_fruit in self.left.fruit_position:
+        for left_fruit in self.left.fruit_position:
             for right_fruit in reversed_right_position:
                 if np.linalg.norm(left_fruit - right_fruit) < SAME_PLANT_THRESHOLD:
                     duplicate_count += 1
@@ -53,15 +52,29 @@ class PlantBed:
     def __init__(self):
         self.plants = [Plant() for _ in range(3)]
 
+    #TODO Sprawdzić te modyfikacje !!!
     def set_plant(self, index: int, side: int, fruit_count: int, fruit_position: np.ndarray, plant_type: PlantType):
-        self.plants[index].set_plant_type(plant_type)
-        if side == 0:
-            self.plants[index].set_left(fruit_count, fruit_position)
+        if (plant_type != PlantType.EMPTY):
+            self.plants[index].set_plant_type(plant_type)
+            if side == 0:
+                self.plants[index].set_left(fruit_count, fruit_position)
+            else:
+                self.plants[index].set_right(fruit_count, fruit_position)
         else:
-            self.plants[index].set_right(fruit_count, fruit_position)
+            print("Dodanie pustego.....")
+            if side == 0:
+                self.plants[index].set_left(0, fruit_position)
+            else:
+                self.plants[index].set_right(0, fruit_position)
 
     def get_bed_fruit_count(self, type: PlantType) -> int:
         return sum(plant.get_real_fruit_count() for plant in self.plants if plant.plant_type == type)
+    
+    def get_bed_fruit_count_right(self, type: PlantType) -> int:
+        return sum(plant.right.fruit_count for plant in self.plants if plant.plant_type == type)
+    
+    def get_bed_fruit_count_left(self, type: PlantType) -> int:
+        return sum(plant.left.fruit_count for plant in self.plants if plant.plant_type == type)
 
 
         

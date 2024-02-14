@@ -6,6 +6,7 @@ class PlantType(Enum):
     PEPPER = "PEPPER"
     TOMATO = "TOMATO"
     EGGPLANT = "EGGPLANT"
+    EMPTY = "EMPTY"
     def __str__(self):
         return self.value
 

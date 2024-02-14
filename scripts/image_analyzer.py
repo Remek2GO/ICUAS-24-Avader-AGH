@@ -36,6 +36,32 @@ class ImageAnalyzer:
             "/red/plants_beds", String, self.set_fruit_type
         )
 
+        self.f_beds = open('/root/sim_ws/src/icuas24_competition/images/beds_out.csv', 'w')
+        self.w_beds = csv.writer(self.f_beds)
+
+    def __del__(self):
+
+        #TODO Tu wypisanie informacji o tych danych ?    
+        for bed_id in self.plant_beds.keys():
+            no_pepper = self.plant_beds[bed_id].get_bed_fruit_count(PlantType.PEPPER)
+            no_pepper_l = self.plant_beds[bed_id].get_bed_fruit_count_left(PlantType.PEPPER)
+            no_pepper_r = self.plant_beds[bed_id].get_bed_fruit_count_right(PlantType.PEPPER)
+            
+            no_tomato = self.plant_beds[bed_id].get_bed_fruit_count(PlantType.TOMATO)
+            no_tomato_l = self.plant_beds[bed_id].get_bed_fruit_count_left(PlantType.TOMATO)
+            no_tomato_r = self.plant_beds[bed_id].get_bed_fruit_count_right(PlantType.TOMATO)
+            
+            no_eggplant = self.plant_beds[bed_id].get_bed_fruit_count(PlantType.EGGPLANT)
+            no_eggplant_l = self.plant_beds[bed_id].get_bed_fruit_count_left(PlantType.EGGPLANT)
+            no_eggplant_r = self.plant_beds[bed_id].get_bed_fruit_count_right(PlantType.EGGPLANT)
+            
+            row = [bed_id,"peppers",no_pepper,no_pepper_l,no_pepper_r,"tomatos",no_tomato,no_tomato_l,no_tomato_r,"eggplants",no_eggplant,no_eggplant_l,no_eggplant_r]
+            self.w_beds.writerow(row)
+        
+            
+
+        self.f_beds.close()
+
     def set_fruit_type(self, data: String):
         type = data.data.split(" ")[0]
 
@@ -45,34 +71,49 @@ class ImageAnalyzer:
         # rospy.loginfo(f"Received image for analysis: {msg.img_path_color}")
         self.analysis_queue.append(msg)
 
-    def analyze_image(self, image_for_analysis: ImageForAnalysis, w_beds : csv.writer):
-        
+    def analyze_image(self, image_for_analysis: ImageForAnalysis):
+        #self.w_beds.writerow(["test_2,test_2,test_2,test_2"])
                
         if image_for_analysis.img_id == 10:
+            #self.w_beds.writerow("TEST")
             I = cv2.imread(image_for_analysis.img_path_color)
             D = cv2.imread(image_for_analysis.img_path_depth)
             
-            plant_sides, type = detect_fruits.process_frame(I, D, debug= True)
-                
+            plant_sides, type = detect_fruits.process_frame(I, D)
+            #row = []
+            #row.append(image_for_analysis.bed_id)
+            
+            #for p in plant_sides:
+            #    row.append(p.fruit_type)
+            #    row.append(p.fruit_count)
+           
+            # Jesli nie przeanalizowano ??    
+            # Dodawanie pustego plant bed ??
             if not image_for_analysis.bed_id in self.plant_beds:
                 self.plant_beds[image_for_analysis.bed_id] = PlantBed()
 
+            # Obliczenia dla ew. drugiej strony (korekta)
+                
             for i, plant_side in enumerate(plant_sides):
                 idx = i if image_for_analysis.bed_side == 0 else len(plant_sides) - i - 1
                 self.plant_beds[image_for_analysis.bed_id].set_plant(idx, image_for_analysis.bed_side, plant_side.fruit_count, plant_side.fruit_position.copy(), plant_side.fruit_type)
 
 
-            row = [image_for_analysis.bed_id, self.plant_beds[image_for_analysis.bed_id].plant_type, sum([side.fruit_count for side in plant_sides]),
-                    self.plant_beds[image_for_analysis.bed_id].left.fruit_count, self.plant_beds[image_for_analysis.bed_id].right.fruit_count ]
+           
 
-            f_name = f"{image_for_analysis.bed_id}_log.txt"
-            f_beds = open("/root/sim_ws/src/icuas24_competition/images/"+f_name, 'w')
-            f_beds.write(row)
-            f_beds.close()
+            #, self.plant_beds[image_for_analysis.bed_id]., sum([side.fruit_count for side in plant_sides])]
+            #        self.plant_beds[image_for_analysis.bed_id].left.fruit_count, self.plant_beds[image_for_analysis.bed_id].right.fruit_count ]
+
+            #f_name = f"{image_for_analysis.bed_id}_log.txt"
+            #f_name = "xxx.txt"
+            #f_beds = open("/root/sim_ws/src/icuas24_competition/images/"+f_name, 'w')
+            #f_beds.write(row)
+            #f_beds.close()
 
 
-            print(row)
-            w_beds.writerow(row)
+            #print("[!!!] " + row)
+            #self.w_beds.writerow(row)
+            
             
                 
             # rospy.loginfo(f"Plant bed {image_for_analysis.bed_id} updated")
@@ -80,6 +121,8 @@ class ImageAnalyzer:
                 f"Bed #{image_for_analysis.bed_id} side {image_for_analysis.bed_side} found {sum([side.fruit_count for side in plant_sides])} fruits"
             )
             rospy.loginfo(f"Current fruit count: {self.get_fruit_count(True)}")
+
+        #self.w_beds.writerow(["test_3,test_3,test_3,test_3"])
 
     def get_fruit_count(self, debug=False) -> int:
         sums = 0
@@ -91,21 +134,22 @@ class ImageAnalyzer:
 
         return sums
 
+
     def run(self):
         rate = rospy.Rate(100)
-        f_beds = open('/root/sim_ws/src/icuas24_competition/images/beds_out.csv', 'w')
-        w_beds = csv.writer(f_beds)
+        
+        #self.w_beds.writerow(["test","test","test"])
         while not rospy.is_shutdown():
             if len(self.analysis_queue) > 0:
                 image_for_analysis = self.analysis_queue.pop(0)
-                # rospy.loginfo(f"Analyzing image: {image_for_analysis.img_path_color}")
-
-                self.analyze_image(image_for_analysis,w_beds)
+                rospy.loginfo(f"Analyzing image: {image_for_analysis.img_path_color}")
+                self.analyze_image(image_for_analysis)
 
                 current_fruit_count = self.get_fruit_count()
                 self.current_fruit_count_pub.publish(current_fruit_count)
             rate.sleep()
-        f_beds.close()
+        
+
 
 
 if __name__ == "__main__":

@@ -53,7 +53,7 @@ def process_patch(patch):
             left, top, width, height, area = stats[i]
             bbox_area = width * height
             abbox = area/bbox_area
-            print(bbox_area,"|",area, "|", area/bbox_area)
+            #print(bbox_area,"|",area, "|", area/bbox_area)
             if (bbox_area > 200):
               mask_small = mask[top:top+height,left:left+width]
               dist = cv2.distanceTransform(mask_small, cv2.DIST_L2, 3)
@@ -81,6 +81,9 @@ def process_patch(patch):
         if fruit_count > 0:
             count = fruit_count
             type = k
+        else:
+            count = 0
+            type = -1
 
     centers = np.array(centers)
 
@@ -195,7 +198,7 @@ def process_frame(I, D, debug=False) -> Tuple[List[PlantSide], int]:
         # cv2.imshow("Patch", patch)
         # cv2.waitKey(0)
         count, type, centers = process_patch(patch)
-        plant_type = None
+        plant_type = PlantType.EMPTY
         if type == 0:
             plant_type = PlantType.TOMATO
         elif type == 1:
@@ -223,8 +226,11 @@ def process_frame(I, D, debug=False) -> Tuple[List[PlantSide], int]:
             cv2.circle(I, (int(c[1]*(p[3]-p[2]) + p[2]), int(c[0]*(p[1]-p[0]) + p[0])), 5, (0, 255, 0), -1)
         
         plant_sides.append(plant_side)
-        print(count, " ", fruite_type[type], " ")
-
+        if (type != -1):
+            print(count, " ", fruite_type[type], " ")
+        else:
+            print(count, " ", "empty", " ")
+            
     if debug:
         cv2.imshow("Detection results", I)
         cv2.startWindowThread()

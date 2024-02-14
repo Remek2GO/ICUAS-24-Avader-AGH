@@ -30,18 +30,13 @@ windows:
           waitForRos
           waitForSimulation
           sleep 2
-          roslaunch icuas24_competition spawn_plant.launch name:=plant_1 model_name:=eggplant_4 x:=4.0 y:=4.5 z:=1.1 yaw:=1.5707
-          roslaunch icuas24_competition spawn_plant.launch name:=plant_2 model_name:=tomato_2 x:=4.0 y:=6.0 z:=1.1 yaw:=1.5707
-          roslaunch icuas24_competition spawn_plant.launch name:=plant_3 model_name:=pepper_2 x:=4.0 y:=7.5 z:=1.1 yaw:=1.5707
-          roslaunch icuas24_competition spawn_plant.launch name:=plant_4 model_name:=pepper_4 x:=4.0 y:=4.5 z:=3.9 yaw:=1.5707
-          roslaunch icuas24_competition spawn_plant.launch name:=plant_5 model_name:=tomato_2 x:=4.0 y:=6.0 z:=3.9 yaw:=1.5707
-          roslaunch icuas24_competition spawn_plant.launch name:=plant_6 model_name:=eggplant_2 x:=4.0 y:=7.5 z:=3.9 yaw:=1.5707
           roslaunch icuas24_competition spawn_plant.launch name:=plant_7 model_name:=eggplant_4 x:=4.0 y:=4.5 z:=6.699999999999999 yaw:=1.5707
-          roslaunch icuas24_competition spawn_plant.launch name:=plant_8 model_name:=plant x:=4.0 y:=6.0 z:=6.699999999999999 yaw:=1.5707
-          roslaunch icuas24_competition spawn_plant.launch name:=plant_9 model_name:=eggplant_4 x:=4.0 y:=7.5 z:=6.699999999999999 yaw:=1.5707
+          roslaunch icuas24_competition spawn_plant.launch name:=plant_8 model_name:=pepper_1 x:=4.0 y:=6.0 z:=6.699999999999999 yaw:=1.5707
+          roslaunch icuas24_competition spawn_plant.launch name:=plant_9 model_name:=tomato_3 x:=4.0 y:=7.5 z:=6.699999999999999 yaw:=1.5707
+
           
           
-          rostopic pub --latch /$UAV_NAMESPACE/plants_beds std_msgs/String "Pepper 1 2 3"
+          rostopic pub --latch /$UAV_NAMESPACE/plants_beds std_msgs/String "Pepper 3"
   - arm&takeof:
       layout: tiled
       panes:

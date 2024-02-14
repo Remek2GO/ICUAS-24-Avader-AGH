@@ -17,6 +17,7 @@ if __name__ == "__main__":
     cases = [img_name.split("_")[0] for img_name in img_list if img_name.endswith(".png")]
     cases = list(set(cases))
 
+    
     for c in cases:
         print("Case:" + c)
 
