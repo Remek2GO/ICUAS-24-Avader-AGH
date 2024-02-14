@@ -3,6 +3,8 @@ from .types import PlantType
 from dataclasses import dataclass
 from copy import deepcopy
 
+SAME_PLANT_THRESHOLD = 0.1
+
 @dataclass
 class PlantSide:
     fruit_count: int
@@ -34,13 +36,13 @@ class Plant:
             
                 
         reversed_right_position = deepcopy(self.right.fruit_position)
-        reversed_right_position[:, 0] = 1 - reversed_right_position[:, 0]
+        reversed_right_position[:, 1] = 1 - reversed_right_position[:, 1]
 
         duplicate_count = 0
 
         for left_fruit in self.left.fruit_position:
             for right_fruit in reversed_right_position:
-                if np.linalg.norm(left_fruit - right_fruit) < 0.1:
+                if np.linalg.norm(left_fruit - right_fruit) < SAME_PLANT_THRESHOLD:
                     duplicate_count += 1
         
         return self.left.fruit_count + self.right.fruit_count - duplicate_count
