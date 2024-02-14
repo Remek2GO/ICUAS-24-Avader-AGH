@@ -29,7 +29,6 @@ v_min, v_max = 0, 255
 light = 100
 
 
-# Przetwarzanie fragmentu sceny z owocami
 def process_patch(patch):
     count = -1
     type = -1
@@ -39,35 +38,53 @@ def process_patch(patch):
         mask = cv2.inRange(patch, (t[0], t[2], t[4]), (t[1], t[3], t[5]))
         # maskStacked = np.stack([mask, mask, mask], axis=-1)
         # merg = cv2.hconcat([imageCopy, maskStacked, cv2.bitwise_and(imageCopy, imageCopy, mask=mask)])
-
+ 
         # Filtracja
         mask = cv2.medianBlur(mask, 3)
         # TODO Duzy workaround
         # TODO MINA to by trzeba inaczej zrobic
-        if k == 0 or k == 2:
-            mask = cv2.erode(mask, kernel_3)
-            mask = cv2.erode(mask, kernel_3)
-
+        #if k == 0 or k == 2:
+        #    mask = cv2.erode(mask, kernel_3)
+        #    mask = cv2.erode(mask, kernel_3)
+ 
         num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(mask)
-
-        # Odejmujemy obiekt typu tlo
-        num_labels = num_labels - 1
-        # TODO Dodać analizę jakąś i zabezpiecznie
-        # TODO Np jak obiekty sa zlaczone - to na razie jest dość ordynardny workaround
-
-        # cv2.imshow("Test", mask)
-        # cv2.waitKey(0)
-
+        fruit_count = 0
+        for i in range(1, num_labels):
+            left, top, width, height, area = stats[i]
+            bbox_area = width * height
+            abbox = area/bbox_area
+            print(bbox_area,"|",area, "|", area/bbox_area)
+            if (bbox_area > 200):
+              mask_small = mask[top:top+height,left:left+width]
+              dist = cv2.distanceTransform(mask_small, cv2.DIST_L2, 3)
+              cv2.normalize(dist, dist, 0, 1.0, cv2.NORM_MINMAX)
+ 
+              #Threshold
+              ret, dist_th = (cv2.threshold(dist,0.70 ,255,cv2.THRESH_BINARY))
+              dist_th = np.uint8(dist_th)
+ 
+            #   cv2.imshow("Dist T", dist_th)
+            #   cv2.waitKey(0)
+ 
+              num_labels_small, labels_small, stats_small, centroids_small = cv2.connectedComponentsWithStats(dist_th)
+              fruit_count = fruit_count + num_labels_small -1
+ 
+              for ii in range(1, num_labels_small):
+                #TODO Do sprawdzenia
+                centers.append(((centroids_small[ii][0]+height)/patch.shape[0], (centroids_small[ii][1]+width)/patch.shape[1]))
+                  #Tu wyliczamy dwa centoridy - robimy erozję dopóki nam się to nie rodzieli
+ 
+        #cv2.imshow("Test", mask)
+        #cv2.waitKey(0)
+ 
         # Tu jest założenie, że nie ma krzaków mulitruit :)
-        if num_labels > 0:
-            count = num_labels
+        if fruit_count > 0:
+            count = fruit_count
             type = k
-            
-        for i in range(1, num_labels + 1):
-            centers.append((centroids[i][0]/patch.shape[0], centroids[i][1]/patch.shape[1]))
+ 
             
     centers = np.array(centers)
-
+ 
     return (count, type, centers)
 
 
