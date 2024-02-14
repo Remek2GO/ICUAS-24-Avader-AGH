@@ -52,38 +52,31 @@ def process_patch(patch):
         for i in range(1, num_labels):
             left, top, width, height, area = stats[i]
             bbox_area = width * height
-            abbox = area / bbox_area
-            print(bbox_area, "|", area, "|", area / bbox_area)
-            if bbox_area > 200:
-                mask_small = mask[top : top + height, left : left + width]
-                dist = cv2.distanceTransform(mask_small, cv2.DIST_L2, 3)
-                cv2.normalize(dist, dist, 0, 1.0, cv2.NORM_MINMAX)
-
-                # Threshold
-                ret, dist_th = cv2.threshold(dist, 0.70, 255, cv2.THRESH_BINARY)
-                dist_th = np.uint8(dist_th)
-
-                #   cv2.imshow("Dist T", dist_th)
-                #   cv2.waitKey(0)
-
-                num_labels_small, labels_small, stats_small, centroids_small = (
-                    cv2.connectedComponentsWithStats(dist_th)
-                )
-                fruit_count = fruit_count + num_labels_small - 1
-
-                for ii in range(1, num_labels_small):
-                    # TODO Do sprawdzenia
-                    centers.append(
-                        (
-                            (centroids_small[ii][0] + height) / patch.shape[0],
-                            (centroids_small[ii][1] + width) / patch.shape[1],
-                        )
-                    )
-                    # Tu wyliczamy dwa centoridy - robimy erozję dopóki nam się to nie rodzieli
-
-        # cv2.imshow("Test", mask)
-        # cv2.waitKey(0)
-
+            abbox = area/bbox_area
+            print(bbox_area,"|",area, "|", area/bbox_area)
+            if (bbox_area > 200):
+              mask_small = mask[top:top+height,left:left+width]
+              dist = cv2.distanceTransform(mask_small, cv2.DIST_L2, 3)
+              cv2.normalize(dist, dist, 0, 1.0, cv2.NORM_MINMAX)
+ 
+              #Threshold
+              ret, dist_th = (cv2.threshold(dist,0.70 ,255,cv2.THRESH_BINARY))
+              dist_th = np.uint8(dist_th)
+ 
+            #   cv2.imshow("Dist T", dist_th)
+            #   cv2.waitKey(0)
+ 
+              num_labels_small, labels_small, stats_small, centroids_small = cv2.connectedComponentsWithStats(dist_th)
+              fruit_count = fruit_count + num_labels_small -1
+ 
+              for ii in range(1, num_labels_small):
+                #TODO Do sprawdzenia
+                centers.append(((centroids_small[ii][1]+top)/patch.shape[0], (centroids_small[ii][0]+left)/patch.shape[1]))
+                  #Tu wyliczamy dwa centoridy - robimy erozję dopóki nam się to nie rodzieli
+ 
+        #cv2.imshow("Test", mask)
+        #cv2.waitKey(0)
+ 
         # Tu jest założenie, że nie ma krzaków mulitruit :)
         if fruit_count > 0:
             count = fruit_count
@@ -226,7 +219,9 @@ def process_frame(I, D, debug=False) -> Tuple[List[PlantSide], int]:
             )
 
         cv2.rectangle(I, (p[2], p[0]), (p[3], p[1]), 255, 2)
-
+        for c in centers:
+            cv2.circle(I, (int(c[1]*(p[3]-p[2]) + p[2]), int(c[0]*(p[1]-p[0]) + p[0])), 5, (0, 255, 0), -1)
+        
         plant_sides.append(plant_side)
         print(count, " ", fruite_type[type], " ")
 
