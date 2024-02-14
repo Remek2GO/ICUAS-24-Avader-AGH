@@ -1,4 +1,6 @@
 import random
+import csv
+
 
 # Wspolrzedna X - ktory rzad regalow
 x_shelf = [4.0, 10.0, 16.0]
@@ -46,11 +48,21 @@ plant_bed_number = 1
 
 f = open("plants.txt", "w", encoding="utf-8")
 
+f_plants = open("plants.csv", "w")
+w_platns = csv.writer(f_plants)
+f_beds = open("beds.csv", "w")
+w_beds = csv.writer(f_beds)
+
+
 for rows in range(0, number_of_rows):  # x
     for columns in range(0, number_of_columns):  # y
         for shelfs in range(0, number_of_shelfs):  # z
             print(plant_bed_number)
-            plant_bed_number = plant_bed_number + 1
+
+            peppers = [0, 0, 0]
+            eggplants = [0, 0, 0]
+            tomatos = [0, 0, 0]
+
             for plants in range(0, number_of_plants):  # roslinki
 
                 line = template + "plant_" + str(plant_number)
@@ -58,9 +70,56 @@ for rows in range(0, number_of_rows):  # x
 
                 # TODO Byśmy tutaj losowali/wyznaczali roślinkę ?
                 fruit_type = random.randrange(len(vege))
+
+                fruite_name = vege[fruit_type][0]
+
+                if fruite_name[0 : len(fruite_name) - 2] == "pepper":
+                    peppers[0] += vege[fruit_type][1]
+                    peppers[1] += vege[fruit_type][2]
+                    peppers[2] += vege[fruit_type][3]
+                    row = [
+                        plant_bed_number,
+                        plant_bed_number,
+                        "pepper",
+                        vege[fruit_type][1],
+                        vege[fruit_type][2],
+                        vege[fruit_type][3],
+                    ]
+                    w_platns.writerow(row)
+
+                if fruite_name[0 : len(fruite_name) - 2] == "tomato":
+                    tomatos[0] += vege[fruit_type][1]
+                    tomatos[1] += vege[fruit_type][2]
+                    tomatos[2] += vege[fruit_type][3]
+                    row = [
+                        plant_bed_number,
+                        plant_bed_number,
+                        "tomato",
+                        vege[fruit_type][1],
+                        vege[fruit_type][2],
+                        vege[fruit_type][3],
+                    ]
+                    w_platns.writerow(row)
+
+                if fruite_name[0 : len(fruite_name) - 2] == "eggplant":
+                    eggplants[0] += vege[fruit_type][1]
+                    eggplants[1] += vege[fruit_type][2]
+                    eggplants[2] += vege[fruit_type][3]
+                    row = [
+                        plant_bed_number,
+                        plant_bed_number,
+                        "eggplant",
+                        vege[fruit_type][1],
+                        vege[fruit_type][2],
+                        vege[fruit_type][3],
+                    ]
+                    w_platns.writerow(row)
+
+                # print(fruite_name[0:len(fruite_name)-2] )
+
                 # print(fruit_type)
 
-                line = line + vege[fruit_type][0]
+                line = line + fruite_name
 
                 line = line + " x:=" + str(x_shelf[rows])
                 line = (
@@ -74,4 +133,32 @@ for rows in range(0, number_of_rows):  # x
                 # print(line)
                 f.write(line)
 
+            # Zapis informacji o polce
+
+            print(peppers)
+            print(tomatos)
+            print(eggplants)
+
+            row = [
+                plant_bed_number,
+                "peppers",
+                peppers[0],
+                peppers[1],
+                peppers[2],
+                "tomatos",
+                tomatos[0],
+                tomatos[1],
+                tomatos[2],
+                "eggplants",
+                eggplants[0],
+                eggplants[1],
+                eggplants[2],
+            ]
+
+            w_beds.writerow(row)
+            plant_bed_number = plant_bed_number + 1
+
+
 f.close()
+f_beds.close()
+f_plants.close()
