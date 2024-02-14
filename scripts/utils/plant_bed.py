@@ -32,13 +32,14 @@ class Plant:
         elif self.right is None:
             return self.left.fruit_count
             
-                
-        reversed_right_position = deepcopy(self.right.fruit_position)
-        reversed_right_position[:, 0] = 1 - reversed_right_position[:, 0]
+        # Tutaj jest eliminacja duplikatow 
+
+        #reversed_right_position = deepcopy(self.right.fruit_position)
+        #reversed_right_position[:, 0] = 1 - reversed_right_position[:, 0]
 
         duplicate_count = 0
 
-        for left_fruit in self.left.fruit_position:
+        #for left_fruit in self.left.fruit_position:
             for right_fruit in reversed_right_position:
                 if np.linalg.norm(left_fruit - right_fruit) < 0.1:
                     duplicate_count += 1

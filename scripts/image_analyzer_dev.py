@@ -18,9 +18,10 @@ if __name__ == "__main__":
     cases = list(set(cases))
 
     for c in cases:
+        print("Case:" + c)
 
-        I = cv2.imread(os.path.join(img_path, c + "_color.png"))
-        D = cv2.imread(os.path.join(img_path, c + "_depth.png"))
+        I = cv2.imread(os.path.join(img_path, c + "_manual_color.png"))
+        D = cv2.imread(os.path.join(img_path, c + "_manual_depth.png"))
 
         detect_fruits.process_frame(I, D, debug=True)
     cv2.destroyAllWindows()
