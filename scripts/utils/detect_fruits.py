@@ -71,7 +71,7 @@ def process_patch(patch):
  
               for ii in range(1, num_labels_small):
                 #TODO Do sprawdzenia
-                centers.append(((centroids_small[ii][0]+height)/patch.shape[0], (centroids_small[ii][1]+width)/patch.shape[1]))
+                centers.append(((centroids_small[ii][1]+top)/patch.shape[0], (centroids_small[ii][0]+left)/patch.shape[1]))
                   #Tu wyliczamy dwa centoridy - robimy erozję dopóki nam się to nie rodzieli
  
         #cv2.imshow("Test", mask)
@@ -211,6 +211,8 @@ def process_frame(I, D, debug=False) -> Tuple[List[PlantSide], int]:
             cv2.putText(I, text, (p[2], p[0] + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0,0,255), 2)
         
         cv2.rectangle(I, (p[2], p[0]), (p[3], p[1]), 255, 2)
+        for c in centers:
+            cv2.circle(I, (int(c[1]*(p[3]-p[2]) + p[2]), int(c[0]*(p[1]-p[0]) + p[0])), 5, (0, 255, 0), -1)
         
         plant_sides.append(plant_side)
         print(count, " ", fruite_type[type], " ")
@@ -219,7 +221,7 @@ def process_frame(I, D, debug=False) -> Tuple[List[PlantSide], int]:
     if (debug):
         cv2.imshow("Detection results", I)
         cv2.startWindowThread()
-        cv2.waitKey(0)
+        # cv2.waitKey(0)
         
     return plant_sides, type   
 

@@ -45,7 +45,7 @@ class ImageAnalyzer:
             I = cv2.imread(image_for_analysis.img_path_color)
             D = cv2.imread(image_for_analysis.img_path_depth)
             
-            plant_sides, type = detect_fruits.process_frame(I, D)
+            plant_sides, type = detect_fruits.process_frame(I, D, True)
                 
             if not image_for_analysis.bed_id in self.plant_beds:
                 self.plant_beds[image_for_analysis.bed_id] = PlantBed()
