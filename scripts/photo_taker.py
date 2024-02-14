@@ -98,7 +98,7 @@ class PhotoTaker:
                     unique_id = f"{pos_id[0]}{pos_id[1]}{self.successful_shots[self.bed_id_to_id[pos_id[0]], pos_id[1], 0]}"
                     path = f'{IMAGES_FOLDER_PATH}/{unique_id}'
 
-                    cv2.imwrite(f"{path}_color.png", cv2_img_color)
+                    #cv2.imwrite(f"{path}_color.png", cv2_img_color)
                     self.successful_shots[self.bed_id_to_id[pos_id[0]], pos_id[1], 0] += 1
                     
                     self.current_color_path = f"{path}_color.png"
@@ -118,7 +118,7 @@ class PhotoTaker:
                     rospy.logwarn('Error converting depth image')
                 else:
                     path = f'{IMAGES_FOLDER_PATH}/{pos_id[0]}{pos_id[1]}{self.successful_shots[self.bed_id_to_id[pos_id[0]], pos_id[1], 1]}'
-                    cv2.imwrite(f"{path}_depth.png", cv2_img_depth)
+                    #cv2.imwrite(f"{path}_depth.png", cv2_img_depth)
                     self.successful_shots[self.bed_id_to_id[pos_id[0]], pos_id[1], 1] += 1
 
                     self.current_depth_path = f"{path}_depth.png"

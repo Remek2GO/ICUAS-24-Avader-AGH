@@ -29,9 +29,10 @@ class Plant:
     def get_real_fruit_count(self) -> int:
         if self.left is None and self.right is None:
             return 0
-        elif self.left is None:
+        #TODO DO sprawdzenia - dodane jeśli zliczenie jest równe 0
+        elif self.left is None or self.left.fruit_count == 0:
             return self.right.fruit_count
-        elif self.right is None:
+        elif self.right is None or self.right.fruit_count == 0:
             return self.left.fruit_count
             
                 

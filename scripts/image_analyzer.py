@@ -42,6 +42,8 @@ class ImageAnalyzer:
     def __del__(self):
 
         #TODO Tu wypisanie informacji o tych danych ?    
+        print("Zacznynamy zapis")
+        print(self.plant_beds.keys())
         for bed_id in self.plant_beds.keys():
             no_pepper = self.plant_beds[bed_id].get_bed_fruit_count(PlantType.PEPPER)
             no_pepper_l = self.plant_beds[bed_id].get_bed_fruit_count_left(PlantType.PEPPER)
