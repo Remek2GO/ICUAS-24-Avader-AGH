@@ -46,23 +46,16 @@ class ImageAnalyzer:
             D = cv2.imread(image_for_analysis.img_path_depth)
             
             plant_sides, type = detect_fruits.process_frame(I, D)
-            plant_type = None
-            if type == 0:
-                plant_type = PlantType.TOMATO
-            elif type == 1:
-                plant_type = PlantType.EGGPLANT
-            elif type == 2:
-                plant_type = PlantType.PEPPER
                 
             if not image_for_analysis.bed_id in self.plant_beds:
                 self.plant_beds[image_for_analysis.bed_id] = PlantBed()
                 
             for i, plant_side in enumerate(plant_sides):
                 idx = i if image_for_analysis.bed_side == 0 else len(plant_sides) - i - 1
-                self.plant_beds[image_for_analysis.bed_id].set_plant(idx, image_for_analysis.bed_side, plant_side.fruit_count, plant_side.fruit_position.copy(), plant_type)
+                self.plant_beds[image_for_analysis.bed_id].set_plant(idx, image_for_analysis.bed_side, plant_side.fruit_count, plant_side.fruit_position.copy(), plant_side.fruit_type)
                 
             # rospy.loginfo(f"Plant bed {image_for_analysis.bed_id} updated")
-            rospy.loginfo(f"Bed #{image_for_analysis.bed_id} side {image_for_analysis.bed_side} found {sum([side.fruit_count for side in plant_sides])} {plant_type} fruits")
+            rospy.loginfo(f"Bed #{image_for_analysis.bed_id} side {image_for_analysis.bed_side} found {sum([side.fruit_count for side in plant_sides])} fruits")
             rospy.loginfo(f"Current fruit count: {self.get_fruit_count(True)}")
             
             
