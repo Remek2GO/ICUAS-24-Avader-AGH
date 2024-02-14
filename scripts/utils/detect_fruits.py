@@ -12,7 +12,7 @@ from typing import List, Tuple
 kernel_3 = np.ones((5, 5), np.uint8)
 
 
-fruite_type = ["apple", "eggplant", "citron"]
+fruite_type = ["tomato", "eggplant", "pepper"]
 
 
 # TODO Warto by na te progi jeszcze raz zerknać
