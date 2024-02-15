@@ -42,6 +42,9 @@ vege = [["plant",0,0,0],
 #
 # Orignialny przelot
 #rostopic pub --latch /$UAV_NAMESPACE/plants_beds std_msgs/String "Pepper 10 11 14 21 23 24"
+#4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27
+#  rostopic pub --latch /$UAV_NAMESPACE/plants_beds std_msgs/String "Tomato 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27"
+        
 
 template = "roslaunch icuas24_competition spawn_plant.launch name:="
 
@@ -57,70 +60,70 @@ f_beds = open("beds.csv", "w")
 w_beds = csv.writer(f_beds)
 
 
+plant_names = ['pepper', 'tomato','eggplant']
+# Zliczenia warzyw: suma, lewa strona, prawa strona.
+
+
 for rows in range(0, number_of_rows):  # x
     for columns in range(0, number_of_columns):  # y
         for shelfs in range(0, number_of_shelfs):  # z
             print(plant_bed_number)
+            plant_counts = [[0, 0, 0],[0, 0, 0],[0, 0, 0]]
 
-            peppers = [0, 0, 0]
-            eggplants = [0, 0, 0]
-            tomatos = [0, 0, 0]
+       
+            # Ustalenie liczy rośline na półce (na pierwszej po jednej roślince, na drugiej po dwie)
+            numbers = [0, 1, 2]
+            if (rows == 0 and columns == 0):
+                plant_locations = random.sample(numbers, 1)
+            elif (rows ==0 and columns == 1):
+                plant_locations = random.sample(numbers, 2) 
+            else:
+                plant_locations = numbers
 
-            for plants in range(0, number_of_plants):  # roslinki
+                
+
+            for plants in plant_locations:  # roslinki
 
                 line = template + "plant_" + str(plant_number)
                 line = line + " model_name:="
 
-                # TODO Byśmy tutaj losowali/wyznaczali roślinkę ?
+                # Losowanie roslinki
                 fruit_type = random.randrange(len(vege))
 
                 fruite_name = vege[fruit_type][0]
 
+                # Wyznacznie orientacji krzaczka (losowa)
+                fruit_orientation = random.randrange(2)
+
+                # Dekodowanie id warzywa
                 if fruite_name[0 : len(fruite_name) - 2] == "pepper":
-                    peppers[0] += vege[fruit_type][1]
-                    peppers[1] += vege[fruit_type][2]
-                    peppers[2] += vege[fruit_type][3]
-                    row = [
+                    vid = 0
+                elif fruite_name[0 : len(fruite_name) - 2] == "eggplant":
+                    vid = 2
+                elif fruite_name[0 : len(fruite_name) - 2] == "tomato":
+                    vid = 1
+
+                # Zapisaywanie ile jest warzyw danego typu    
+                plant_counts[vid][0] += vege[fruit_type][1]
+                if (fruit_orientation == 0):
+                    plant_counts[vid][1] += vege[fruit_type][2]
+                    plant_counts[vid][2] += vege[fruit_type][3]
+                else: 
+                    plant_counts[vid][1] += vege[fruit_type][3]
+                    plant_counts[vid][2] += vege[fruit_type][2]
+                    
+                row = [
                         plant_bed_number,
                         plant_bed_number,
-                        "pepper",
+                        plant_names[vid],
                         vege[fruit_type][1],
                         vege[fruit_type][2],
                         vege[fruit_type][3],
                     ]
-                    w_platns.writerow(row)
+                w_platns.writerow(row)
 
-                if fruite_name[0 : len(fruite_name) - 2] == "tomato":
-                    tomatos[0] += vege[fruit_type][1]
-                    tomatos[1] += vege[fruit_type][2]
-                    tomatos[2] += vege[fruit_type][3]
-                    row = [
-                        plant_bed_number,
-                        plant_bed_number,
-                        "tomato",
-                        vege[fruit_type][1],
-                        vege[fruit_type][2],
-                        vege[fruit_type][3],
-                    ]
-                    w_platns.writerow(row)
-
-                if fruite_name[0 : len(fruite_name) - 2] == "eggplant":
-                    eggplants[0] += vege[fruit_type][1]
-                    eggplants[1] += vege[fruit_type][2]
-                    eggplants[2] += vege[fruit_type][3]
-                    row = [
-                        plant_bed_number,
-                        plant_bed_number,
-                        "eggplant",
-                        vege[fruit_type][1],
-                        vege[fruit_type][2],
-                        vege[fruit_type][3],
-                    ]
-                    w_platns.writerow(row)
-
-                # print(fruite_name[0:len(fruite_name)-2] )
-
-                # print(fruit_type)
+            
+                # Utworzenie linijki konfiguracyjnej.             
 
                 line = line + fruite_name
 
@@ -129,7 +132,10 @@ for rows in range(0, number_of_rows):  # x
                     line + " y:=" + str(y_shelf_offset[columns] + y_shelf_start[plants])
                 )
                 line = line + " z:=" + str(z_shelf[shelfs])
-                line = line + " yaw:=" + str(yaw)
+                if ( fruit_orientation == 0 ):                
+                    line = line + " yaw:=" + str(yaw)
+                else:
+                    line = line + " yaw:=" + str(-yaw)                    
                 line = line + "\n"
 
                 plant_number = plant_number + 1
@@ -138,24 +144,24 @@ for rows in range(0, number_of_rows):  # x
 
             # Zapis informacji o polce
 
-            print(peppers)
-            print(tomatos)
-            print(eggplants)
+            #print(peppers)
+            #print(tomatos)
+            #print(eggplants)
 
             row = [
                 plant_bed_number,
                 "peppers",
-                peppers[0],
-                peppers[1],
-                peppers[2],
+                plant_counts[0][0],
+                plant_counts[0][1],
+                plant_counts[0][2],
                 "tomatos",
-                tomatos[0],
-                tomatos[1],
-                tomatos[2],
+                plant_counts[1][0],
+                plant_counts[1][1],
+                plant_counts[1][2],
                 "eggplants",
-                eggplants[0],
-                eggplants[1],
-                eggplants[2],
+                plant_counts[2][0],
+                plant_counts[2][1],
+                plant_counts[2][2],
             ]
 
             w_beds.writerow(row)

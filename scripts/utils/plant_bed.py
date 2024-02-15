@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from .types import PlantType
 
-SAME_PLANT_THRESHOLD = 0.1
+SAME_PLANT_THRESHOLD = 0.15 #TODO Było 0.1
 
 
 @dataclass
