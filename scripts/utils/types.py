@@ -60,6 +60,20 @@ class PathStatus(Enum):
 
 
 @dataclass
+class PlantBedsIds:
+    """Class for storing the location of the beds of plants of the specific type to \
+        visit during flight.
+
+    Attributes:
+        plant_type: `PlantType`: The type of the plant.
+        bed_ids: `List[int]`: The list of bed ids.
+    """
+
+    plant_type: PlantType
+    bed_ids: List[int]
+
+
+@dataclass
 class Setpoint:
     """Class for setpoint definition.
 
@@ -78,17 +92,3 @@ class Setpoint:
     roll: float
     pitch: float
     yaw: float
-
-
-@dataclass
-class PlantBed:
-    """Class for storing the location of the plant bed of specific type to visit \
-        during flight.
-
-    Attributes:
-        plant_type: `PlantType`: The type of the plant.
-        bed_ids: `List[int]`: The list of bed ids.
-    """
-
-    plant_type: PlantType
-    bed_ids: List[int]
