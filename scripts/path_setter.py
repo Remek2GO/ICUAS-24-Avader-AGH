@@ -12,10 +12,18 @@ from std_msgs.msg import Bool, String, Int32
 from geometry_msgs.msg import PoseStamped, Transform
 from tf.transformations import quaternion_from_euler
 from trajectory_msgs.msg import MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
-
 from typing import List
+
 from scripts.utils import A_star
-from scripts.utils.types import PlantType, TrackerStatus, PathStatus, Setpoint, PlantBed
+from scripts.utils.types import (
+    PlantType,
+    TrackerStatus,
+    PathStatus,
+    Setpoint,
+    PlantBedsIds,
+)
+
+from icuas24_competition.msg import UavSetpoint
 
 
 class PathSetter:
@@ -24,13 +32,15 @@ class PathSetter:
     def __init__(self) -> None:
         """Initialize the PathSetter class."""
         self.challenge_started = False
-        self.plant_beds: PlantBed = None
+        self.plant_beds: PlantBedsIds = None
         self.tracker_status = TrackerStatus.OFF
         self.idx_setpoint = 0
         self.path_status = PathStatus.REACHED
+        self.move_on: bool = True
         self.rate = rospy.Rate(20)
         self.current_fruit_count = 0
         self.setpoints: List[Setpoint] = []
+        self.take_photo_msg: UavSetpoint = UavSetpoint()
 
         # ROS publishers
         self.pub_pose = rospy.Publisher(
@@ -40,7 +50,7 @@ class PathSetter:
         self.pub_trajectory = rospy.Publisher(
             "/red/tracker/input_trajectory", MultiDOFJointTrajectory, queue_size=10
         )
-        self.pub_take_photo = rospy.Publisher("/take_photo", Bool, queue_size=10)
+        self.pub_take_photo = rospy.Publisher("/take_photo", UavSetpoint, queue_size=10)
 
         # ROS subscribers
         self.sub_challenge_started = rospy.Subscriber(
@@ -55,6 +65,10 @@ class PathSetter:
         self.sub_current_fruit_count = rospy.Subscriber(
             "/current_fruit_count", Int32, self._set_current_fruit_count_clb
         )
+        self.sub_move_on = rospy.Subscriber("/move_on", Bool, self._move_on_clb)
+
+    def _move_on_clb(self, data: Bool):
+        self.move_on = data.data
 
     def _set_challenge_started_clb(self, data: Bool):
         if data.data is True:
@@ -67,7 +81,7 @@ class PathSetter:
         # Input format: "plant_type bed_id1 bed_id2 ..."
         plant_beds = data.data.split(" ")
 
-        self.plant_beds = PlantBed(
+        self.plant_beds = PlantBedsIds(
             PlantType(plant_beds[0].upper()), [int(bed_id) for bed_id in plant_beds[1:]]
         )
 
@@ -148,14 +162,26 @@ class PathSetter:
             ):
                 self.path_status = PathStatus.REACHED
                 rospy.sleep(1)
-                self.pub_take_photo.publish(Bool(True))
+                self.pub_take_photo.publish(self.take_photo_msg)
+                self.move_on = False
+                rospy.loginfo("[Path Setter] Take photo")
                 # rospy.loginfo("Setpoint reached")
-            elif self.path_status == PathStatus.REACHED:
+            elif self.path_status == PathStatus.REACHED and self.move_on:
                 # Set the next setpoint
                 rospy.loginfo(
                     f"Setting new setpoint {self.setpoints[self.idx_setpoint]}"
                 )
+                # Send new setpoint to the tracker
                 self.set_setpoint(self.setpoints[self.idx_setpoint])
+
+                # Update take photo message
+                self.take_photo_msg.x = self.setpoints[self.idx_setpoint].x
+                self.take_photo_msg.y = self.setpoints[self.idx_setpoint].y
+                self.take_photo_msg.z = self.setpoints[self.idx_setpoint].z
+                self.take_photo_msg.roll = self.setpoints[self.idx_setpoint].roll
+                self.take_photo_msg.pitch = self.setpoints[self.idx_setpoint].pitch
+                self.take_photo_msg.yaw = self.setpoints[self.idx_setpoint].yaw
+
                 self.idx_setpoint += 1
                 self.path_status = PathStatus.WAITING
 
@@ -206,7 +232,7 @@ if __name__ == "__main__":
     arg_use_points = "--use-points" in myargv
 
     rospy.init_node("path_setter", anonymous=True)
-    rospy.loginfo("path_setter node started")
+    rospy.loginfo("[Path Setter] Node started")
 
     path_setter = PathSetter()
     path_setter.wait_for_challenge_start()

@@ -1,19 +1,13 @@
 #!/usr/bin/env python
+"""Implementation of the A* algorithm to find the path to follow."""
 
-import numpy as np
-from dataclasses import dataclass
-from scripts.utils import positions
 import copy
+import numpy as np
 
+# from dataclasses import dataclass
+from scripts.utils import positions
+from scripts.utils.types import Setpoint
 
-@dataclass
-class Setpoint:
-    x: float
-    y: float
-    z: float
-    roll: float
-    pitch: float
-    yaw: float
 
 class A_star:
     def __init__(self, start_location, heuristic) -> None:
@@ -26,7 +20,7 @@ class A_star:
         self.path = []
 
     def add_setpoint(self, number, setpoint: Setpoint):
-        self.setpoints.update({number : setpoint})
+        self.setpoints.update({number: setpoint})
 
     def MST(self, setpoint):
 
@@ -38,15 +32,15 @@ class A_star:
         selected_node[0] = True
         sum_weights = 0
 
-        while (no_edge < len(N) - 1):
-            
+        while no_edge < len(N) - 1:
+
             minimum = np.inf
             a = 0
             b = 0
             for m in N:
                 if selected_node[N.index(m)]:
                     for n in N:
-                        if ((not selected_node[N.index(n)])):
+                        if not selected_node[N.index(n)]:
                             if minimum > self.heuristic_distances[m][n]:
                                 minimum = self.heuristic_distances[m][n]
                                 a = m
@@ -64,12 +58,12 @@ class A_star:
         for setpoint in self.setpoints.keys():
             self.open_list.append(setpoint)
         self.open_list.remove(current_node)
-        self.open_list.remove(current_node+1)
+        self.open_list.remove(current_node + 1)
 
         while not end_found:
             f_cost = {}
 
-            print("\n Aktualna pozycja: ", current_node/2, " \n")
+            print("\n Aktualna pozycja: ", current_node / 2, " \n")
             if len(self.open_list) != 1:
                 for setpoint in self.open_list:
                     h_cost = self.MST(setpoint)
@@ -79,15 +73,36 @@ class A_star:
                     for point in open_list_copy:
                         if self.heuristic_distances[point][0] < min_cost:
                             min_cost = self.heuristic_distances[point][0]
-                    if LOCALIZATION[np.floor(setpoint/2)][setpoint%2][2] == LOCALIZATION[np.floor(current_node/2)][current_node%2][2]:
+                    if (
+                        LOCALIZATION[np.floor(setpoint / 2)][setpoint % 2][2]
+                        == LOCALIZATION[np.floor(current_node / 2)][current_node % 2][2]
+                    ):
                         h_cost = h_cost - 3
-                    if LOCALIZATION[np.floor(setpoint/2)][setpoint%2][5] == LOCALIZATION[np.floor(current_node/2)][current_node%2][5]:
+                    if (
+                        LOCALIZATION[np.floor(setpoint / 2)][setpoint % 2][5]
+                        == LOCALIZATION[np.floor(current_node / 2)][current_node % 2][5]
+                    ):
                         h_cost = h_cost - 0.1
-                    if LOCALIZATION[np.floor(setpoint/2)][setpoint%2][0] != LOCALIZATION[np.floor(current_node/2)][current_node%2][0]:
+                    if (
+                        LOCALIZATION[np.floor(setpoint / 2)][setpoint % 2][0]
+                        != LOCALIZATION[np.floor(current_node / 2)][current_node % 2][0]
+                    ):
                         h_cost = h_cost + 1
-                    f_cost.update({setpoint : g_cost + self.heuristic_distances[current_node][setpoint] + h_cost})
-                    print(setpoint/2, " - ", g_cost + self.heuristic_distances[current_node][setpoint] + h_cost)
-                
+                    f_cost.update(
+                        {
+                            setpoint: g_cost
+                            + self.heuristic_distances[current_node][setpoint]
+                            + h_cost
+                        }
+                    )
+                    print(
+                        setpoint / 2,
+                        " - ",
+                        g_cost
+                        + self.heuristic_distances[current_node][setpoint]
+                        + h_cost,
+                    )
+
                 next_node = min(f_cost, key=f_cost.get)
                 self.path.append(next_node)
                 self.open_list.remove(next_node)
@@ -100,8 +115,8 @@ class A_star:
                 self.close_list.append(next_node)
                 self.open_list.remove(next_node)
                 current_node = next_node
-            
-            if self.open_list == []: 
+
+            if self.open_list == []:
                 end_found = True
                 path = self.intermediate_points(self.path, LOCALIZATION)
                 return path
@@ -112,10 +127,10 @@ class A_star:
 
         points_to_visit = []
         for elem in areas_to_visit:
-            points_to_visit.append(LOCALIZATION[np.floor(elem/2)][elem%2])
-        
+            points_to_visit.append(LOCALIZATION[np.floor(elem / 2)][elem % 2])
+
         print("Punkty bez pośrednich :", points_to_visit)
-        new_path.append([points_to_visit[0][0],2,points_to_visit[0][2],0,0,0])
+        new_path.append([points_to_visit[0][0], 2, points_to_visit[0][2], 0, 0, 0])
         for point in points_to_visit:
             if not previous_point:
                 point_copy = copy.copy(point)
@@ -129,7 +144,7 @@ class A_star:
                 else:
                     previous_point_copy = copy.deepcopy(previous_point)
                     point_copy = copy.deepcopy(point)
-                    previous_point_copy[5] = np.pi/2
+                    previous_point_copy[5] = np.pi / 2
                     if abs(previous_point[1] - 25) > abs(previous_point[1] - 2):
                         previous_point_copy[1] = 2
                     else:
@@ -145,7 +160,7 @@ class A_star:
         point_copy = copy.copy(point)
         point_copy[1] = 2
         new_path.append(point_copy)
-        new_path.append([0,0,1,0,0,0])
+        new_path.append([0, 0, 1, 0, 0, 0])
         return new_path
 
     def prepare_points(self, points_from_drone):
@@ -153,20 +168,25 @@ class A_star:
         example_of_points.append(0)
         example_of_points.append(1)
         for x in points_from_drone:
-            example_of_points.append(x*2)
-            example_of_points.append(x*2+1)
+            example_of_points.append(x * 2)
+            example_of_points.append(x * 2 + 1)
         return example_of_points
+
 
 def start(AREAS_FROM_DRONE):
 
     LOCALIZATION = positions.POINTS_OF_INTEREST
     HEURISTIC = positions.matrix_of_distances()
-    Astar_fly = A_star(start_location=Setpoint(*LOCALIZATION[0][0]), heuristic=HEURISTIC)
+    Astar_fly = A_star(
+        start_location=Setpoint(*LOCALIZATION[0][0]), heuristic=HEURISTIC
+    )
     POINTS_TO_VISIT = Astar_fly.prepare_points(AREAS_FROM_DRONE)
 
-    for setpoint in POINTS_TO_VISIT:    
-        Astar_fly.add_setpoint(setpoint, Setpoint(*LOCALIZATION[np.floor(setpoint/2)][setpoint%2]))
+    for setpoint in POINTS_TO_VISIT:
+        Astar_fly.add_setpoint(
+            setpoint, Setpoint(*LOCALIZATION[np.floor(setpoint / 2)][setpoint % 2])
+        )
 
     final_path = Astar_fly.search_path(LOCALIZATION)
-    
+
     return final_path
