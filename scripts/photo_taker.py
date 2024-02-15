@@ -1,212 +1,221 @@
 #!/usr/bin/env python
+"""Photo taker node to take photos of the plants."""
+
 import os
 import sys
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
+import cv2
 import rospy
 import numpy as np
-from std_msgs.msg import String, Bool
-from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
+from geometry_msgs.msg import Transform
 from nav_msgs.msg import Odometry
-from cv_bridge import CvBridge, CvBridgeError
-import cv2
-from scripts.utils import positions
-from tf.transformations import euler_from_quaternion
-from typing import List, Tuple
-from icuas24_competition.msg import ImageForAnalysis
+from sensor_msgs.msg import Image
+from std_msgs.msg import Bool
+from tf.transformations import euler_from_quaternion, quaternion_from_euler
+from trajectory_msgs.msg import MultiDOFJointTrajectoryPoint
+from typing import Tuple
 
+from icuas24_competition.msg import ImageForAnalysis, UavSetpoint
+from scripts.utils.positions import PointOfInterest, POINTS_OF_INTEREST
+from scripts.utils.types import Setpoint
 
 bridge = CvBridge()
 
 IMAGES_FOLDER_PATH = "/root/sim_ws/src/icuas24_competition/images"
 PROXIMITY_THRESHOLD = 0.5
-YAW_THRESHOLD = np.pi/45 #TODO bylo 8
+YAW_THRESHOLD = np.pi / 180
 MAX_IMAGES = 5
 FRAMES_TO_SKIP = 10
 
-class PhotoTaker:
-    def __init__(self):
-        self.image_topic_depth = "/red/camera/depth/image_raw"
-        self.image_topic_color = "/red/camera/color/image_raw"
-        self.odom_topic = "/red/odometry"
-        self.plant_beds_topic = "/red/plants_beds"
-        self.image_for_analysis_topic = "/image_for_analysis"
-        self.take_photo_topic = "/take_photo"
 
-        self.current_odom: Odometry = None
+class PhotoTaker:
+    """Class to take photos of the plants."""
+
+    def __init__(self, frequency: float):
+        """Initialize the PhotoTaker class.
+
+        Args:
+            frequency (float): The frequency of the node.
+        """
         self.current_color_path: str = None
         self.current_depth_path: str = None
         self.current_color_msg: Image = None
         self.current_depth_msg: Image = None
-        self.current_position_id = (-1, -1)
-        self.last_position_id = (-1, -1)
+        self.current_odom: Odometry = None
+        self.take_photo: bool = False
+        self.take_photo_setpoint: Setpoint = None
 
-        self.color_counter = 0
-        self.depth_counter = 0
+        self.rate = rospy.Rate(frequency)
 
-        rospy.Subscriber(self.plant_beds_topic, String, self.plants_beds_callback)
-        rospy.Subscriber(self.take_photo_topic, Bool, self.take_photo_callback)
-        self.pub_image_taken = rospy.Publisher(self.image_for_analysis_topic, ImageForAnalysis, queue_size=10)
-        
-    def take_photo_callback(self, msg: Bool):
-        #self.current_odom
-        pos_id = self.current_position_id    
+        # Rospy subscribers and publishers
+        # rospy.Subscriber("/red/plants_beds", String, self._plants_beds_clb)
+        rospy.Subscriber("/take_photo", UavSetpoint, self._take_photo_clb)
+        rospy.Subscriber("/red/camera/depth/image_raw", Image, self._image_depth_clb)
+        rospy.Subscriber("/red/camera/color/image_raw", Image, self._image_color_clb)
+        rospy.Subscriber("red/odometry", Odometry, self._odom_clb)
+        self.pub_image_taken = rospy.Publisher(
+            "/image_for_analysis", ImageForAnalysis, queue_size=10
+        )
+        self.pub_move_on = rospy.Publisher("/move_on", Bool, queue_size=10)
+        self.pub_position_hold = rospy.Publisher(
+            "/position_hold/trajectory", MultiDOFJointTrajectoryPoint, queue_size=10
+        )
 
-        odom_position = [
-            self.current_odom.pose.pose.position.x, 
-            self.current_odom.pose.pose.position.y, 
-            self.current_odom.pose.pose.position.z, 
-            *euler_from_quaternion([self.current_odom.pose.pose.orientation.x, 
-                                    self.current_odom.pose.pose.orientation.y, 
-                                    self.current_odom.pose.pose.orientation.z, 
-                                    self.current_odom.pose.pose.orientation.w])]
-
-        #poi_position = positions.POINTS_OF_INTEREST[pos_id[0]][pos_id[1]]
-
-        print("[ROLL PITCH YAW] ===")
-        print("[ROLL]" + str(odom_position[-3]/np.pi*180))
-        print("[PITCH]" + str(odom_position[-2]/np.pi*180))
-        print("[YAW]" + str(odom_position[-1]/np.pi*180))
-        print("[ROLL PITCH YAW] ===")
-        #print("[YAW - WANTED]" + str(poi_position[-1]))
-
-        
-        
-        if msg.data and not -1 in pos_id:
-            img_color = bridge.imgmsg_to_cv2(self.current_color_msg, "bgr8")
-            img_depth = bridge.imgmsg_to_cv2(self.current_depth_msg, "8UC1")
-            
-            unique_id = f"{self.last_position_id[0]}{self.last_position_id[1]}_manual"
-            path = f'{IMAGES_FOLDER_PATH}/{unique_id}'
-            
-            
-            cv2.putText(img_color, str(odom_position[-3]/np.pi*180) ,(0, 0 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255),  2)
-            cv2.putText(img_color, str(odom_position[-2]/np.pi*180) ,(0, 0 + 50), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255),  2)
-            cv2.putText(img_color, str(odom_position[-1]/np.pi*180) ,(0, 0 + 80), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255),  2)
-
-
-            cv2.imwrite(f"{path}_color.png", img_color)
-            cv2.imwrite(f"{path}_depth.png", img_depth)
-            
-            img_msg = ImageForAnalysis()
-            img_msg.img_path_color = f"{path}_color.png"
-            img_msg.img_path_depth = f"{path}_depth.png"
-            img_msg.bed_id = np.uint8(self.last_position_id[0])
-            img_msg.bed_side = np.uint8(self.last_position_id[1])
-            img_msg.img_id = 10
-            img_msg.pose = self.current_odom.pose.pose
-            self.pub_image_taken.publish(img_msg)
-        
-
-    def plants_beds_callback(self, msg: String):
-        rospy.Subscriber(self.image_topic_depth, Image, self.image_callback_depth)
-        rospy.Subscriber(self.image_topic_color, Image, self.image_callback_color)
-        rospy.Subscriber(self.odom_topic, Odometry, self.odom_callback)
-
-        bed_ids = [int(bed_id) for bed_id in msg.data.split(" ")[1:]]
-        self.set_bed_ids(bed_ids)
-
-    def set_bed_ids(self, bed_ids: List[int]):
-        self.bed_ids = bed_ids
-        self.bed_id_to_id = {bed_id: i for i, bed_id in enumerate(bed_ids)}
-        self.successful_shots = np.zeros((len(bed_ids), 2, 2), dtype=np.uint8)
-
-    def image_callback_color(self, msg):
-        pos_id = self.current_position_id
+    def _image_color_clb(self, msg: Image):
         self.current_color_msg = msg
-        if not -1 in pos_id and self.successful_shots[self.bed_id_to_id[pos_id[0]], pos_id[1], 0] < MAX_IMAGES:
-            self.color_counter += 1
-            if self.color_counter%FRAMES_TO_SKIP == 1:
-                try:
-                    cv2_img_color = bridge.imgmsg_to_cv2(msg, "bgr8")
-                except CvBridgeError:
-                    rospy.logwarn('Error converting color image')
-                else:
-                    unique_id = f"{pos_id[0]}{pos_id[1]}{self.successful_shots[self.bed_id_to_id[pos_id[0]], pos_id[1], 0]}"
-                    path = f'{IMAGES_FOLDER_PATH}/{unique_id}'
 
-                    #cv2.imwrite(f"{path}_color.png", cv2_img_color)
-                    self.successful_shots[self.bed_id_to_id[pos_id[0]], pos_id[1], 0] += 1
-                    
-                    self.current_color_path = f"{path}_color.png"
-                    # rospy.loginfo(f'Image saved as {path}_color.png')
-        else:
-            self.color_counter = 0
-
-    def image_callback_depth(self, msg):
-        pos_id = self.current_position_id
+    def _image_depth_clb(self, msg: Image):
         self.current_depth_msg = msg
-        if not -1 in pos_id and self.successful_shots[self.bed_id_to_id[pos_id[0]], pos_id[1], 1] < MAX_IMAGES:
-            self.depth_counter += 1
-            if self.depth_counter%FRAMES_TO_SKIP == 1:
-                try:
-                    cv2_img_depth = bridge.imgmsg_to_cv2(msg, "8UC1")
-                except CvBridgeError:
-                    rospy.logwarn('Error converting depth image')
-                else:
-                    path = f'{IMAGES_FOLDER_PATH}/{pos_id[0]}{pos_id[1]}{self.successful_shots[self.bed_id_to_id[pos_id[0]], pos_id[1], 1]}'
-                    #cv2.imwrite(f"{path}_depth.png", cv2_img_depth)
-                    self.successful_shots[self.bed_id_to_id[pos_id[0]], pos_id[1], 1] += 1
 
-                    self.current_depth_path = f"{path}_depth.png"
-                    # rospy.loginfo(f'Image saved as {path}_depth.png')
-        else:
-            self.depth_counter = 0
-
-    def odom_callback(self, msg):
+    def _odom_clb(self, msg: Odometry):
         self.current_odom = msg
-        for bed_id in self.bed_ids:
-            for position_id in range(2):
-                if self.is_close_to_position(msg, (bed_id, position_id)):
-                    self.current_position_id = (bed_id, position_id)
-                    self.last_position_id = self.current_position_id
-                    return
-        if self.current_position_id != (-1, -1):
-            rospy.loginfo(f"Took {self.successful_shots[self.bed_id_to_id[self.current_position_id[0]], self.current_position_id[1], 0]} images of bed {self.current_position_id[0]} side {self.current_position_id[1]}")
-        self.current_position_id = (-1, -1)
-            
-    def is_close_to_position(self, odom_msg: Odometry, position_ids: Tuple[int, int]) -> bool:
-        odom_position = [
-            odom_msg.pose.pose.position.x, 
-            odom_msg.pose.pose.position.y, 
-            odom_msg.pose.pose.position.z, 
-            *euler_from_quaternion([odom_msg.pose.pose.orientation.x, 
-                                    odom_msg.pose.pose.orientation.y, 
-                                    odom_msg.pose.pose.orientation.z, 
-                                    odom_msg.pose.pose.orientation.w])]
-        poi_position = positions.POINTS_OF_INTEREST[position_ids[0]][position_ids[1]]
-        
-        return np.linalg.norm(np.array(odom_position[:3]) - np.array(poi_position[:3])) < PROXIMITY_THRESHOLD and \
-                (np.abs(odom_position[-1]-poi_position[-1]) < YAW_THRESHOLD or np.abs(odom_position[-1]-poi_position[-1]) > 2*np.pi-YAW_THRESHOLD)
-    
-    def run(self):
-        while not rospy.is_shutdown():
-            if self.current_color_path is not None and self.current_depth_path is not None:
-                msg = ImageForAnalysis()
-                msg.img_path_color = self.current_color_path
-                msg.img_path_depth = self.current_depth_path
-                msg.bed_id = np.uint8(self.last_position_id[0])
-                msg.bed_side = np.uint8(self.last_position_id[1])
-                msg.img_id = int(self.successful_shots[self.bed_id_to_id[self.last_position_id[0]], self.last_position_id[1], 0])
-                msg.pose = self.current_odom.pose.pose
 
-                self.pub_image_taken.publish(msg)
-                self.current_color_path = None
-                self.current_depth_path = None
-            rospy.sleep(0.01)
-    
+    def _take_photo_clb(self, msg: UavSetpoint):
+        # Read setpoint
+        self.take_photo_setpoint = Setpoint(
+            x=msg.x, y=msg.y, z=msg.z, roll=msg.roll, pitch=msg.pitch, yaw=msg.yaw
+        )
+
+        # Set flag to take a photo
+        self.take_photo = True
+
+    def is_close_to_position(self) -> Tuple[bool, int, int]:
+        """Check if the drone is close enaugh to the point of interest.
+
+        Returns:
+            `bool`: `True` if the drone is close enaugh to the point of interest, \
+                `False` otherwise.
+        """
+        odom_position = [
+            self.current_odom.pose.pose.position.x,
+            self.current_odom.pose.pose.position.y,
+            self.current_odom.pose.pose.position.z,
+            *euler_from_quaternion(
+                [
+                    self.current_odom.pose.pose.orientation.x,
+                    self.current_odom.pose.pose.orientation.y,
+                    self.current_odom.pose.pose.orientation.z,
+                    self.current_odom.pose.pose.orientation.w,
+                ]
+            ),
+        ]
+        poi: PointOfInterest = [
+            self.take_photo_setpoint.x,
+            self.take_photo_setpoint.y,
+            self.take_photo_setpoint.z,
+            0.0,
+            0.0,
+            self.take_photo_setpoint.yaw,
+        ]
+
+        # Get the id of the bed side
+        bed_side = -1
+        if poi[-1] == 0.0:
+            bed_side = 0
+        else:
+            bed_side = 1
+
+        # Get bed id
+        bed_id = -1
+        for poi_id, (bed_side_0, bed_side_1) in POINTS_OF_INTEREST.items():
+            if bed_side == 0:
+                if np.allclose(bed_side_0[:3], poi[:3], rtol=0.0, atol=0.1):
+                    bed_id = poi_id
+                    break
+            else:
+                if np.allclose(bed_side_1[:3], poi[:3], rtol=0.0, atol=0.1):
+                    bed_id = poi_id
+                    break
+
+        distance = np.linalg.norm(np.array(odom_position[:3]) - np.array(poi[:3]))
+        yaw_diff = np.abs(odom_position[-1] - poi[-1])
+
+        rospy.loginfo(
+            f"[Photo Taker] ({bed_id}, {bed_side}) Distance: {distance}, \
+                Yaw diff: |{odom_position[-1]} - {poi[-1]}| = {yaw_diff}"
+        )
+        return (
+            distance < PROXIMITY_THRESHOLD
+            and (yaw_diff < YAW_THRESHOLD or yaw_diff > 2 * np.pi - YAW_THRESHOLD),
+            bed_id,
+            bed_side,
+        )
+
+    def run(self):
+        """Run the photo taker node.
+
+        This method is the main loop of the photo taker node. It checks if the drone \
+            is close enaugh to the point of interest and takes a photo if it is. \
+            Otherwise, it publishes the position hold setpoint to move the drone \
+            closer to the point of interest.
+        """
+        while not rospy.is_shutdown():
+            if self.take_photo:
+                close_enaugh, bed_id, bed_side = self.is_close_to_position()
+                if bed_id == -1 or bed_side == -1:
+                    self.take_photo = False
+                    self.pub_move_on.publish(Bool(True))
+                else:
+                    if close_enaugh:
+                        self.take_photo = False
+                        self.pub_move_on.publish(Bool(True))
+
+                        # Get images from messages
+                        img_color = bridge.imgmsg_to_cv2(self.current_color_msg, "bgr8")
+                        img_depth = bridge.imgmsg_to_cv2(self.current_depth_msg, "8UC1")
+
+                        unique_id = f"{bed_id}{bed_side}_manual"
+                        path = f"{IMAGES_FOLDER_PATH}/{unique_id}"
+
+                        cv2.imwrite(f"{path}_color.png", img_color)
+                        cv2.imwrite(f"{path}_depth.png", img_depth)
+
+                        img_msg = ImageForAnalysis()
+                        img_msg.img_path_color = f"{path}_color.png"
+                        img_msg.img_path_depth = f"{path}_depth.png"
+                        img_msg.bed_id = np.uint8(bed_id)
+                        img_msg.bed_side = np.uint8(bed_side)
+                        img_msg.img_id = 10
+                        img_msg.pose = self.current_odom.pose.pose
+                        self.pub_image_taken.publish(img_msg)
+                    else:
+                        # Publish position hold setpoint
+                        transform = Transform()
+                        transform.translation.x = self.take_photo_setpoint.x
+                        transform.translation.y = self.take_photo_setpoint.y
+                        transform.translation.z = self.take_photo_setpoint.z
+                        x, y, z, w = quaternion_from_euler(
+                            self.take_photo_setpoint.roll,
+                            self.take_photo_setpoint.pitch,
+                            self.take_photo_setpoint.yaw,
+                        )
+                        transform.rotation.x = x
+                        transform.rotation.y = y
+                        transform.rotation.z = z
+                        transform.rotation.w = w
+                        point = MultiDOFJointTrajectoryPoint()
+                        point.transforms = []
+                        point.transforms.append(transform)
+                        self.pub_position_hold.publish(point)
+            self.rate.sleep()
+
 
 if __name__ == "__main__":
-    rospy.init_node('photo_taker')
-    rospy.loginfo('photo_taker node started')
+    myargv = rospy.myargv(argv=sys.argv)
+    frequency = 50.0
+    if len(myargv) < 2:
+        rospy.logwarn(
+            f"[Photo Taker] Frequency not provided, using default value {frequency} Hz"
+        )
+    else:
+        frequency = float(myargv[1])
 
-    photo_taker = PhotoTaker()
+    rospy.init_node("photo_taker")
+    rospy.loginfo("[Photo Taker] Node started")
+
+    photo_taker = PhotoTaker(frequency)
     photo_taker.run()
-
-
-
-
-
-
-

@@ -7,13 +7,13 @@ topp_tracker:
   constraints:
 
     velocity:
-      x: 5
-      y: 5
-      z: 5
-      yaw: 2.5
+      x: 10
+      y: 10
+      z: 10
+      yaw: 5
 
     acceleration:
-      x: 1.5
-      y: 1.5
-      z: 1.0
-      yaw: 1.5
+      x: 3
+      y: 3
+      z: 2
+      yaw: 3

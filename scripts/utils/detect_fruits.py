@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from .plant_bed import PlantSide
+from .plant_bed import PlantSideCount
 from .types import PlantType
 from typing import List, Tuple
 
@@ -48,50 +48,54 @@ def process_patch(patch):
         # if k == 0 or k == 2:
         #    mask = cv2.erode(mask, kernel_3)
         #    mask = cv2.erode(mask, kernel_3)
-        #cv2.imshow("Mask", mask)
-        #cv2.waitKey(0)
+        # cv2.imshow("Mask", mask)
+        # cv2.waitKey(0)
 
         num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(mask)
         fruit_count = 0
         for i in range(1, num_labels):
             left, top, width, height, area = stats[i]
             bbox_area = width * height
-            
-            print(bbox_area,"|",area, "|", area/bbox_area)
-            if (bbox_area > 200 and area > 100):
-                mask_small = mask[top:top+height,left:left+width]
+
+            print(bbox_area, "|", area, "|", area / bbox_area)
+            if bbox_area > 200 and area > 100:
+                mask_small = mask[top : top + height, left : left + width]
                 dist = cv2.distanceTransform(mask_small, cv2.DIST_L2, 3)
                 cv2.normalize(dist, dist, 0, 1.0, cv2.NORM_MINMAX)
-    
-                #Threshold
-                ret, dist_th = (cv2.threshold(dist,0.70 ,255,cv2.THRESH_BINARY))
+
+                # Threshold
+                ret, dist_th = cv2.threshold(dist, 0.70, 255, cv2.THRESH_BINARY)
                 dist_th = np.uint8(dist_th)
-    
-                #cv2.imshow("Dist T", dist_th)
-                #cv2.waitKey(0)
-    
-                num_labels_small, labels_small, stats_small, centroids_small = cv2.connectedComponentsWithStats(dist_th)
-                #print("Liczba malych obiektow" + str(num_labels_small))
+
+                # cv2.imshow("Dist T", dist_th)
+                # cv2.waitKey(0)
+
+                num_labels_small, labels_small, stats_small, centroids_small = (
+                    cv2.connectedComponentsWithStats(dist_th)
+                )
+                # print("Liczba malych obiektow" + str(num_labels_small))
 
                 for ii in range(1, num_labels_small):
                     left_s, top_s, width_s, height_s, area_s = stats_small[ii]
-                    #print("Small area" + str(area_s))
-                    if area_s >10:
-                        fruit_count+=1
-                        centers.append(((centroids_small[ii][1]+top)/patch.shape[0], (centroids_small[ii][0]+left)/patch.shape[1]))
-                
-                #for ii in range(1, num_labels_small):
-                    #TODO Do sprawdzenia
-                    
-                    #Tu wyliczamy dwa centoridy - robimy erozję dopóki nam się to nie rodzieli
-    
-        
- 
+                    # print("Small area" + str(area_s))
+                    if area_s > 10:
+                        fruit_count += 1
+                        centers.append(
+                            (
+                                (centroids_small[ii][1] + top) / patch.shape[0],
+                                (centroids_small[ii][0] + left) / patch.shape[1],
+                            )
+                        )
+
+                # for ii in range(1, num_labels_small):
+                # TODO Do sprawdzenia
+
+                # Tu wyliczamy dwa centoridy - robimy erozję dopóki nam się to nie rodzieli
+
         # Tu jest założenie, że nie ma krzaków mulitruit :)
         if fruit_count > 0:
             count = fruit_count
             type = k
-        
 
     centers = np.array(centers)
 
@@ -173,7 +177,7 @@ def get_patches(masked_result):
 
 # Przetwarzanie pojedycznej ramki
 # obraz RGB i odpowiadajaca mapa glebi
-def process_frame(I, D, debug=False) -> Tuple[List[PlantSide], int]:
+def process_frame(I, D, debug=False) -> Tuple[List[PlantSideCount], int]:
 
     # Maska smigla
     I = preprocess_color_image(I)
@@ -213,7 +217,7 @@ def process_frame(I, D, debug=False) -> Tuple[List[PlantSide], int]:
             plant_type = PlantType.EGGPLANT
         elif type == 2:
             plant_type = PlantType.PEPPER
-        plant_side = PlantSide(
+        plant_side = PlantSideCount(
             fruit_count=count, fruit_position=centers, fruit_type=plant_type
         )
 
@@ -231,19 +235,24 @@ def process_frame(I, D, debug=False) -> Tuple[List[PlantSide], int]:
 
         cv2.rectangle(I, (p[2], p[0]), (p[3], p[1]), 255, 2)
         for c in centers:
-            cv2.circle(I, (int(c[1]*(p[3]-p[2]) + p[2]), int(c[0]*(p[1]-p[0]) + p[0])), 5, (0, 255, 0), -1)
-        
+            cv2.circle(
+                I,
+                (int(c[1] * (p[3] - p[2]) + p[2]), int(c[0] * (p[1] - p[0]) + p[0])),
+                5,
+                (0, 255, 0),
+                -1,
+            )
+
         plant_sides.append(plant_side)
-        if (type == -1):
+        if type == -1:
             print(count, " ", "empty", " ")
         else:
             print(count, " ", fruite_type[type], " ")
-        
 
-    #if debug:
-    #    cv2.imshow("Detection results", I)
-    #    cv2.startWindowThread()
-    #    cv2.waitKey(0)
+    # if debug:
+    cv2.imshow("Detection results", I)
+    cv2.startWindowThread()
+    cv2.waitKey(1)
 
     return plant_sides, type
 
