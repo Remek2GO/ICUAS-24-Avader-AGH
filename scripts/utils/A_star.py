@@ -8,6 +8,8 @@ import numpy as np
 from scripts.utils import positions
 from scripts.utils.types import Setpoint
 
+DEBUG_MODE = False
+
 
 class A_star:
     def __init__(self, start_location, heuristic) -> None:
@@ -63,7 +65,8 @@ class A_star:
         while not end_found:
             f_cost = {}
 
-            print("\n Aktualna pozycja: ", current_node / 2, " \n")
+            if DEBUG_MODE:
+                print("\n Aktualna pozycja: ", current_node / 2, " \n")
             if len(self.open_list) != 1:
                 for setpoint in self.open_list:
                     h_cost = self.MST(setpoint)
@@ -95,13 +98,14 @@ class A_star:
                             + h_cost
                         }
                     )
-                    print(
-                        setpoint / 2,
-                        " - ",
-                        g_cost
-                        + self.heuristic_distances[current_node][setpoint]
-                        + h_cost,
-                    )
+                    if DEBUG_MODE:
+                        print(
+                            setpoint / 2,
+                            " - ",
+                            g_cost
+                            + self.heuristic_distances[current_node][setpoint]
+                            + h_cost,
+                        )
 
                 next_node = min(f_cost, key=f_cost.get)
                 self.path.append(next_node)
@@ -129,7 +133,8 @@ class A_star:
         for elem in areas_to_visit:
             points_to_visit.append(LOCALIZATION[np.floor(elem / 2)][elem % 2])
 
-        print("Punkty bez pośrednich :", points_to_visit)
+        if DEBUG_MODE:
+            print("Punkty bez pośrednich :", points_to_visit)
         new_path.append([points_to_visit[0][0], 2, points_to_visit[0][2], 0, 0, 0])
         for point in points_to_visit:
             if not previous_point:

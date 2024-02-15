@@ -9,6 +9,7 @@ from .types import PlantType
 
 SAME_PLANT_THRESHOLD = 0.15 #TODO Było 0.1
 
+DEBUG_MODE = False
 
 @dataclass
 class PlantSideCount:
@@ -78,7 +79,8 @@ class PlantBed:
             else:
                 self.plants[index].set_right(fruit_count, fruit_position)
         else:
-            print("Dodanie pustego.....")
+            if DEBUG_MODE:
+                print("Dodanie pustego.....")
             if side == 0:
                 self.plants[index].set_left(0, fruit_position)
             else:

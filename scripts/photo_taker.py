@@ -26,11 +26,12 @@ from scripts.utils.types import Setpoint
 bridge = CvBridge()
 
 IMAGES_FOLDER_PATH = "/root/sim_ws/src/icuas24_competition/images"
-PROXIMITY_THRESHOLD = 0.5
+PROXIMITY_THRESHOLD = 0.1
 YAW_THRESHOLD = np.pi / 180
 MAX_IMAGES = 5
 FRAMES_TO_SKIP = 10
 
+DEBUG_MODE = False
 
 class PhotoTaker:
     """Class to take photos of the plants."""
@@ -134,10 +135,11 @@ class PhotoTaker:
         distance = np.linalg.norm(np.array(odom_position[:3]) - np.array(poi[:3]))
         yaw_diff = np.abs(odom_position[-1] - poi[-1])
 
-        rospy.loginfo(
-            f"[Photo Taker] ({bed_id}, {bed_side}) Distance: {distance}, \
-                Yaw diff: |{odom_position[-1]} - {poi[-1]}| = {yaw_diff}"
-        )
+        if DEBUG_MODE:
+            rospy.loginfo(
+                f"[Photo Taker] ({bed_id}, {bed_side}) Distance: {distance}, \
+                    Yaw diff: |{odom_position[-1]} - {poi[-1]}| = {yaw_diff}"
+            )
         return (
             distance < PROXIMITY_THRESHOLD
             and (yaw_diff < YAW_THRESHOLD or yaw_diff > 2 * np.pi - YAW_THRESHOLD),
@@ -171,6 +173,7 @@ class PhotoTaker:
                         unique_id = f"{bed_id}{bed_side}_manual"
                         path = f"{IMAGES_FOLDER_PATH}/{unique_id}"
 
+                        # if DEBUG_MODE:
                         cv2.imwrite(f"{path}_color.png", img_color)
                         cv2.imwrite(f"{path}_depth.png", img_depth)
 

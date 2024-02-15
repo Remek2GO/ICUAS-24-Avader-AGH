@@ -9,8 +9,10 @@ from typing import List, Tuple
 # TODO - maska na smigla
 # TODO -
 
-kernel_3 = np.ones((5, 5), np.uint8)
 
+DEBUG_MODE = False
+
+kernel_3 = np.ones((5, 5), np.uint8)
 
 fruite_type = ["tomato", "eggplant", "pepper"]
 
@@ -27,6 +29,7 @@ h_min, h_max = 0, 179
 s_min, s_max = 0, 255
 v_min, v_max = 0, 255
 light = 100
+
 
 
 def process_patch(patch):
@@ -57,7 +60,8 @@ def process_patch(patch):
             left, top, width, height, area = stats[i]
             bbox_area = width * height
 
-            print(bbox_area, "|", area, "|", area / bbox_area)
+            if DEBUG_MODE:
+                print(bbox_area, "|", area, "|", area / bbox_area)
             if bbox_area > 200 and area > 100:
                 mask_small = mask[top : top + height, left : left + width]
                 dist = cv2.distanceTransform(mask_small, cv2.DIST_L2, 3)
@@ -159,9 +163,10 @@ def get_patches(masked_result):
                 width = width - 24
                 height = height - 12
                 # cv2.rectangle(I, (left, top), (left + width, top + height), 255, 2)
-                print(
-                    f"Component {i}: Area={area}, Centroid={centroids[i].astype(int)}"
-                )
+                if DEBUG_MODE:
+                    print(
+                        f"Component {i}: Area={area}, Centroid={centroids[i].astype(int)}"
+                    )
                 # Wycinek
                 patches.append((top, top + height, left, left + width))
 
@@ -244,15 +249,17 @@ def process_frame(I, D, debug=False) -> Tuple[List[PlantSideCount], int]:
             )
 
         plant_sides.append(plant_side)
-        if type == -1:
-            print(count, " ", "empty", " ")
-        else:
-            print(count, " ", fruite_type[type], " ")
 
-    # if debug:
-    cv2.imshow("Detection results", I)
-    cv2.startWindowThread()
-    cv2.waitKey(1)
+        if DEBUG_MODE:
+            if type == -1:
+                print(count, " ", "empty", " ")
+            else:
+                print(count, " ", fruite_type[type], " ")
+
+    if DEBUG_MODE:
+        cv2.imshow("Detection results", I)
+        cv2.startWindowThread()
+        cv2.waitKey(1)
 
     return plant_sides, type
 

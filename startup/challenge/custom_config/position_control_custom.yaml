@@ -14,9 +14,9 @@ control:
       z: 0.0
 
   pos_x:  
-    kp: 1.05
+    kp: 2.05
     ki: 0.0
-    kd: 0.0
+    kd: 0.05
     lim_low: -15
     lim_high: 15
   
@@ -28,9 +28,9 @@ control:
     lim_high: 0.4  
 
   pos_y:
-    kp: 1.05
+    kp: 2.05
     ki: 0.0
-    kd: 0.0
+    kd: 0.05
     lim_low: -15
     lim_high: 15
    
@@ -42,9 +42,9 @@ control:
     lim_high: 0.4 
 
   pos_z:
-    kp: 1.5
+    kp: 2.5
     ki: 0.05
-    kd: 0.0
+    kd: 0.05
     lim_low: -1.5
     lim_high: 2.5
 
@@ -56,7 +56,7 @@ control:
     lim_high: 0.5
   
   yaw_rate:
-    kp: 1.75
+    kp: 2.25
     ki: 0.0
     kd: 0.1
     lim_low: -20

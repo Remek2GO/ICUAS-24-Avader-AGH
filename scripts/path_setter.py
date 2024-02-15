@@ -26,6 +26,8 @@ from scripts.utils.types import (
 from icuas24_competition.msg import UavSetpoint
 
 
+DEBUG_MODE = False
+
 class PathSetter:
     """Class to set the path for the tracker to follow."""
 
@@ -41,6 +43,7 @@ class PathSetter:
         self.current_fruit_count = 0
         self.setpoints: List[Setpoint] = []
         self.take_photo_msg: UavSetpoint = UavSetpoint()
+        self.flight_time = 0
 
         # ROS publishers
         self.pub_pose = rospy.Publisher(
@@ -73,6 +76,9 @@ class PathSetter:
     def _set_challenge_started_clb(self, data: Bool):
         if data.data is True:
             self.challenge_started = True
+
+        self.flight_time = rospy.get_time()
+        
 
     def _set_current_fruit_count_clb(self, data: Int32):
         self.current_fruit_count = data.data
@@ -164,13 +170,16 @@ class PathSetter:
                 rospy.sleep(1)
                 self.pub_take_photo.publish(self.take_photo_msg)
                 self.move_on = False
-                rospy.loginfo("[Path Setter] Take photo")
+
+                if DEBUG_MODE:
+                    rospy.loginfo("[Path Setter] Take photo")
                 # rospy.loginfo("Setpoint reached")
             elif self.path_status == PathStatus.REACHED and self.move_on:
                 # Set the next setpoint
-                rospy.loginfo(
-                    f"Setting new setpoint {self.setpoints[self.idx_setpoint]}"
-                )
+                if DEBUG_MODE:
+                    rospy.loginfo(
+                        f"Setting new setpoint {self.setpoints[self.idx_setpoint]}"
+                    )
                 # Send new setpoint to the tracker
                 self.set_setpoint(self.setpoints[self.idx_setpoint])
 
@@ -224,6 +233,9 @@ class PathSetter:
         """
         rospy.loginfo("Challenge completed")
         self.pub_fruit_count.publish(self.current_fruit_count)
+
+        self.flight_time = rospy.get_time() - self.flight_time
+        rospy.loginfo(f"Flight Time: {self.flight_time}" )
 
 
 if __name__ == "__main__":

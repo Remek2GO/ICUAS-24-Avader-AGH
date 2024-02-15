@@ -16,6 +16,8 @@ from scripts.utils.types import PlantType
 from scripts.utils import detect_fruits
 import cv2
 
+DEBUG_MODE = False
+
 
 class ImageAnalyzer:
     def __init__(self):
@@ -44,51 +46,53 @@ class ImageAnalyzer:
     def __del__(self):
 
         # TODO Tu wypisanie informacji o tych danych ?
-        print("Zacznynamy zapis")
-        print(self.plant_beds.keys())
-        for bed_id in self.plant_beds.keys():
-            no_pepper = self.plant_beds[bed_id].get_bed_fruit_count(PlantType.PEPPER)
-            no_pepper_l = self.plant_beds[bed_id].get_bed_fruit_count_left(
-                PlantType.PEPPER
-            )
-            no_pepper_r = self.plant_beds[bed_id].get_bed_fruit_count_right(
-                PlantType.PEPPER
-            )
+        if DEBUG_MODE:
+            print("Zacznynamy zapis")
+            print(self.plant_beds.keys())
 
-            no_tomato = self.plant_beds[bed_id].get_bed_fruit_count(PlantType.TOMATO)
-            no_tomato_l = self.plant_beds[bed_id].get_bed_fruit_count_left(
-                PlantType.TOMATO
-            )
-            no_tomato_r = self.plant_beds[bed_id].get_bed_fruit_count_right(
-                PlantType.TOMATO
-            )
+            for bed_id in self.plant_beds.keys():
+                no_pepper = self.plant_beds[bed_id].get_bed_fruit_count(PlantType.PEPPER)
+                no_pepper_l = self.plant_beds[bed_id].get_bed_fruit_count_left(
+                    PlantType.PEPPER
+                )
+                no_pepper_r = self.plant_beds[bed_id].get_bed_fruit_count_right(
+                    PlantType.PEPPER
+                )
 
-            no_eggplant = self.plant_beds[bed_id].get_bed_fruit_count(
-                PlantType.EGGPLANT
-            )
-            no_eggplant_l = self.plant_beds[bed_id].get_bed_fruit_count_left(
-                PlantType.EGGPLANT
-            )
-            no_eggplant_r = self.plant_beds[bed_id].get_bed_fruit_count_right(
-                PlantType.EGGPLANT
-            )
+                no_tomato = self.plant_beds[bed_id].get_bed_fruit_count(PlantType.TOMATO)
+                no_tomato_l = self.plant_beds[bed_id].get_bed_fruit_count_left(
+                    PlantType.TOMATO
+                )
+                no_tomato_r = self.plant_beds[bed_id].get_bed_fruit_count_right(
+                    PlantType.TOMATO
+                )
 
-            row = [
-                bed_id,
-                "peppers",
-                no_pepper,
-                no_pepper_l,
-                no_pepper_r,
-                "tomatos",
-                no_tomato,
-                no_tomato_l,
-                no_tomato_r,
-                "eggplants",
-                no_eggplant,
-                no_eggplant_l,
-                no_eggplant_r,
-            ]
-            self.w_beds.writerow(row)
+                no_eggplant = self.plant_beds[bed_id].get_bed_fruit_count(
+                    PlantType.EGGPLANT
+                )
+                no_eggplant_l = self.plant_beds[bed_id].get_bed_fruit_count_left(
+                    PlantType.EGGPLANT
+                )
+                no_eggplant_r = self.plant_beds[bed_id].get_bed_fruit_count_right(
+                    PlantType.EGGPLANT
+                )
+
+                row = [
+                    bed_id,
+                    "peppers",
+                    no_pepper,
+                    no_pepper_l,
+                    no_pepper_r,
+                    "tomatos",
+                    no_tomato,
+                    no_tomato_l,
+                    no_tomato_r,
+                    "eggplants",
+                    no_eggplant,
+                    no_eggplant_l,
+                    no_eggplant_r,
+                ]
+                self.w_beds.writerow(row)
 
         self.f_beds.close()
 
@@ -149,19 +153,20 @@ class ImageAnalyzer:
             # self.w_beds.writerow(row)
 
             # rospy.loginfo(f"Plant bed {image_for_analysis.bed_id} updated")
-            rospy.loginfo(
-                f"Bed #{image_for_analysis.bed_id} side {image_for_analysis.bed_side} found {sum([side.fruit_count for side in plant_sides])} fruits"
-            )
-            rospy.loginfo(f"Current fruit count: {self.get_fruit_count(True)}")
-            print(f"Current fruit count: {self.get_fruit_count(True)}")
+            if DEBUG_MODE:
+                rospy.loginfo(
+                    f"Bed #{image_for_analysis.bed_id} side {image_for_analysis.bed_side} found {sum([side.fruit_count for side in plant_sides])} fruits"
+                )
+                rospy.loginfo(f"Current fruit count: {self.get_fruit_count()}")
+                print(f"Current fruit count: {self.get_fruit_count()}")
 
         # self.w_beds.writerow(["test_3,test_3,test_3,test_3"])
 
-    def get_fruit_count(self, debug=False) -> int:
+    def get_fruit_count(self) -> int:
         sums = 0
         for bed_id in self.plant_beds.keys():
             no_fruits = self.plant_beds[bed_id].get_bed_fruit_count(self.fruit_type)
-            if debug:
+            if DEBUG_MODE:
                 rospy.loginfo(f"Bed #{bed_id} total fruit count: {no_fruits}")
             sums += no_fruits
 
@@ -174,12 +179,18 @@ class ImageAnalyzer:
         while not rospy.is_shutdown():
             if len(self.analysis_queue) > 0:
                 image_for_analysis = self.analysis_queue.pop(0)
-                rospy.loginfo(f"Analyzing image: {image_for_analysis.img_path_color}")
+                if DEBUG_MODE:
+                    rospy.loginfo(
+                        f"Analyzing image: {image_for_analysis.img_path_color}"
+                    )
                 self.analyze_image(image_for_analysis)
 
                 current_fruit_count = self.get_fruit_count()
                 self.current_fruit_count_pub.publish(current_fruit_count)
-                print(f"[!!!] Current fruit count: {current_fruit_count}")
+
+                if DEBUG_MODE:
+                    print(f"[!!!] Current fruit count: {current_fruit_count}")
+
             rate.sleep()
 
 

@@ -25,7 +25,7 @@ windows:
           use_sim_time:=true
           x:=1 y:=1
           world:=$(rospack find icuas24_competition)/worlds/full_of_fruits.world
-        - waitForRos; waitForSimulation; rosrun rqt_gui rqt_gui
+        # - waitForRos; waitForSimulation; rosrun rqt_gui rqt_gui
         - |
           waitForRos
           waitForSimulation
