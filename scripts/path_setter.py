@@ -1,7 +1,9 @@
 #!/usr/bin/env python
+"""ROS node to set the path for the tracker to follow."""
 
 import os
 import sys
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
@@ -10,16 +12,17 @@ from std_msgs.msg import Bool, String, Int32
 from geometry_msgs.msg import PoseStamped, Transform
 from tf.transformations import quaternion_from_euler
 from trajectory_msgs.msg import MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
-import numpy as np
-from dataclasses import dataclass
-from enum import Enum
+
 from typing import List
 from scripts.utils import A_star
 from scripts.utils.types import PlantType, TrackerStatus, PathStatus, Setpoint, PlantBed
 
 
 class PathSetter:
+    """Class to set the path for the tracker to follow."""
+
     def __init__(self) -> None:
+        """Initialize the PathSetter class."""
         self.challenge_started = False
         self.plant_beds: PlantBed = None
         self.tracker_status = TrackerStatus.OFF
@@ -27,7 +30,9 @@ class PathSetter:
         self.path_status = PathStatus.REACHED
         self.rate = rospy.Rate(20)
         self.current_fruit_count = 0
+        self.setpoints: List[Setpoint] = []
 
+        # ROS publishers
         self.pub_pose = rospy.Publisher(
             "/red/tracker/input_pose", PoseStamped, queue_size=10
         )
@@ -36,47 +41,52 @@ class PathSetter:
             "/red/tracker/input_trajectory", MultiDOFJointTrajectory, queue_size=10
         )
         self.pub_take_photo = rospy.Publisher("/take_photo", Bool, queue_size=10)
-        
+
+        # ROS subscribers
         self.sub_challenge_started = rospy.Subscriber(
-            "/red/challenge_started", Bool, self.set_challenge_started
+            "/red/challenge_started", Bool, self._set_challenge_started_clb
         )
         self.sub_plants_beds = rospy.Subscriber(
-            "/red/plants_beds", String, self.set_plants_beds
+            "/red/plants_beds", String, self._set_plants_beds_clb
         )
         self.sub_tracker_status = rospy.Subscriber(
-            "/red/tracker/status", String, self.check_tracker_status
+            "/red/tracker/status", String, self._set_tracker_status_clb
         )
         self.sub_current_fruit_count = rospy.Subscriber(
-            "/current_fruit_count", Int32, self.set_current_fruit_count
+            "/current_fruit_count", Int32, self._set_current_fruit_count_clb
         )
 
-        self.setpoints: List[Setpoint] = []
-
-    def set_challenge_started(self, data: Bool):
-        if data.data == True:
+    def _set_challenge_started_clb(self, data: Bool):
+        if data.data is True:
             self.challenge_started = True
 
-    def set_plants_beds(self, data: String):
+    def _set_current_fruit_count_clb(self, data: Int32):
+        self.current_fruit_count = data.data
+
+    def _set_plants_beds_clb(self, data: String):
+        # Input format: "plant_type bed_id1 bed_id2 ..."
         plant_beds = data.data.split(" ")
 
         self.plant_beds = PlantBed(
             PlantType(plant_beds[0].upper()), [int(bed_id) for bed_id in plant_beds[1:]]
         )
 
-    def check_tracker_status(self, data: String):
+    def _set_tracker_status_clb(self, data: String):
         self.tracker_status = TrackerStatus(data.data)
-        
-    def set_current_fruit_count(self, data: Int32):
-        self.current_fruit_count = data.data
 
     def set_setpoint(self, setpoint: Setpoint):
+        """Set the setpoint for the tracker to follow.
+
+        Args:
+            setpoint (Setpoint): The setpoint to publish on the tracker topic.
+        """
         msg = PoseStamped()
         msg.pose.position.x = setpoint.x
         msg.pose.position.y = setpoint.y
         msg.pose.position.z = setpoint.z
 
-        euler_RPY = [setpoint.roll, setpoint.pitch, setpoint.yaw]
-        quaternion = quaternion_from_euler(euler_RPY[0], euler_RPY[1], euler_RPY[2])
+        quaternion = quaternion_from_euler(setpoint.roll, setpoint.pitch, setpoint.yaw)
+        # NOTE: The order of the quaternion is (x, y, z, w) - ROS tf convention
         msg.pose.orientation.x = quaternion[0]
         msg.pose.orientation.y = quaternion[1]
         msg.pose.orientation.z = quaternion[2]
@@ -85,20 +95,38 @@ class PathSetter:
         self.pub_pose.publish(msg)
 
     def add_setpoint(self, setpoint: Setpoint):
+        """Add a new setpoint to the list of setpoints.
+
+        Args:
+            setpoint (Setpoint): The setpoint to add to the list.
+        """
         self.setpoints.append(setpoint)
 
     def wait_for_challenge_start(self):
+        """Wait for the challenge to start.
+
+        This method waits for the 3 conditions to be met:
+        - to receive the challenge_started message,
+        - to receive the plant_beds message,
+        - to receive the tracker status "OFF" message.
+        """
         rospy.loginfo("Waiting for challenge to start")
         while (
             not self.challenge_started
-            or self.plant_beds == None
+            or self.plant_beds is None
             or self.tracker_status == TrackerStatus.OFF
         ):
             self.rate.sleep()
         rospy.loginfo("Challenge started")
 
     def run(self):
+        """Run the path setter node.
+
+        This method runs the path setter node. It waits for the tracker to reach the \
+            setpoint, then it sets the next setpoint.
+        """
         while not self.path_status == PathStatus.COMPLETED:
+            # UAV reached the last setpoint
             if self.path_status == PathStatus.REACHED and self.idx_setpoint == len(
                 self.setpoints
             ):
@@ -106,12 +134,14 @@ class PathSetter:
                 self.handle_challenge_completed()
                 return
 
+            # UAV flying to the next setpoint
             if (
                 self.tracker_status == TrackerStatus.ACTIVE
                 and self.path_status == PathStatus.WAITING
             ):
                 self.path_status = PathStatus.PROGRESS
 
+            # UAV reached the setpoint
             if (
                 self.path_status == PathStatus.PROGRESS
                 and self.tracker_status == TrackerStatus.ACCEPT
@@ -121,6 +151,7 @@ class PathSetter:
                 self.pub_take_photo.publish(Bool(True))
                 # rospy.loginfo("Setpoint reached")
             elif self.path_status == PathStatus.REACHED:
+                # Set the next setpoint
                 rospy.loginfo(
                     f"Setting new setpoint {self.setpoints[self.idx_setpoint]}"
                 )
@@ -131,6 +162,11 @@ class PathSetter:
             self.rate.sleep()
 
     def send_trajectory(self):
+        """Send the entire trajectory to the tracker to follow.
+
+        This is an alternative to the run method. It sends the entire trajectory to \
+            the tracker to follow instead of sending each setpoint individually.
+        """
         trajectory = MultiDOFJointTrajectory()
         trajectory.header.stamp = rospy.Time.now()
         trajectory.header.frame_id = "world"
@@ -142,51 +178,63 @@ class PathSetter:
             transform.translation.x = setpoint.x
             transform.translation.y = setpoint.y
             transform.translation.z = setpoint.z
-            x, y, z, w = quaternion_from_euler(setpoint.roll, setpoint.pitch, setpoint.yaw)
+            x, y, z, w = quaternion_from_euler(
+                setpoint.roll, setpoint.pitch, setpoint.yaw
+            )
             transform.rotation.x = x
             transform.rotation.y = y
             transform.rotation.z = z
             transform.rotation.w = w
-            
+
             point.transforms.append(transform)
             trajectory.points.append(point)
-        
+
         self.pub_trajectory.publish(trajectory)
 
     def handle_challenge_completed(self):
+        """Handle the challenge completion.
+
+        This method publishes the final fruit count to the `/fruit_count` topic.
+        """
         rospy.loginfo("Challenge completed")
         self.pub_fruit_count.publish(self.current_fruit_count)
 
-MANUAL = False
-# MANUAL = True
-
-USE_POINTS = True
-# USE_POINTS = False
 
 if __name__ == "__main__":
+    myargv = rospy.myargv(argv=sys.argv)
+    arg_manual = "--manual" in myargv
+    arg_use_points = "--use-points" in myargv
+
     rospy.init_node("path_setter", anonymous=True)
     rospy.loginfo("path_setter node started")
 
     path_setter = PathSetter()
     path_setter.wait_for_challenge_start()
 
-    if MANUAL:
+    if arg_manual:
+        # Manual setpoints
         x = input("X:")
         y = input("Y:")
         z = input("Z:")
         roll = input("Roll:")
         pitch = input("Pitch:")
         yaw = input("Yaw:")
-        path_setter.add_setpoint(Setpoint(float(x), float(y), float(z), float(roll), float(pitch), float(yaw)))
+        path_setter.add_setpoint(
+            Setpoint(
+                float(x), float(y), float(z), float(roll), float(pitch), float(yaw)
+            )
+        )
     else:
-        SETPOINTS = A_star.start(path_setter.plant_beds.bed_ids)      
-    
-        for setpoint in SETPOINTS:
+        # A* setpoints
+        setpoints = A_star.start(path_setter.plant_beds.bed_ids)
+        for setpoint in setpoints:
             path_setter.add_setpoint(Setpoint(*setpoint))
 
-    if USE_POINTS:
+    if arg_use_points:
+        # Fly poiny by point
         path_setter.run()
     else:
+        # Send the entire trajectory
         path_setter.send_trajectory()
 
     rospy.spin()
