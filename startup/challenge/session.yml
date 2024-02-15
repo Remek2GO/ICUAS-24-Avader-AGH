@@ -30,7 +30,7 @@ windows:
           waitForRos
           waitForSimulation
           sleep 2          
-          rostopic pub --latch /$UAV_NAMESPACE/plants_beds std_msgs/String "Tomato 1 2 3"
+          rostopic pub --latch /$UAV_NAMESPACE/plants_beds std_msgs/String "Eggplant 1 2 3"
   - arm&takeof:
       layout: tiled
       panes:
