@@ -43,6 +43,8 @@ vege = [["plant",0,0,0],
 # Orignialny przelot
 #rostopic pub --latch /$UAV_NAMESPACE/plants_beds std_msgs/String "Pepper 10 11 14 21 23 24"
 #4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27
+#  rostopic pub --latch /$UAV_NAMESPACE/plants_beds std_msgs/String "Tomato 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27"
+        
 
 template = "roslaunch icuas24_competition spawn_plant.launch name:="
 

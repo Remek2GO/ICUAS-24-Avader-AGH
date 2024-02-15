@@ -21,7 +21,7 @@ bridge = CvBridge()
 
 IMAGES_FOLDER_PATH = "/root/sim_ws/src/icuas24_competition/images"
 PROXIMITY_THRESHOLD = 0.5
-YAW_THRESHOLD = np.pi/45 #TODO bylo 8
+YAW_THRESHOLD = np.pi/16 #TODO bylo 8
 MAX_IMAGES = 5
 FRAMES_TO_SKIP = 10
 
@@ -68,6 +68,7 @@ class PhotoTaker:
         print("[ROLL]" + str(odom_position[-3]/np.pi*180))
         print("[PITCH]" + str(odom_position[-2]/np.pi*180))
         print("[YAW]" + str(odom_position[-1]/np.pi*180))
+        print("POS_ID" + str(pos_id))
         print("[ROLL PITCH YAW] ===")
         #print("[YAW - WANTED]" + str(poi_position[-1]))
 
