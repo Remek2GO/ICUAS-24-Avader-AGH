@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 
 <launch>
-    <node name="path_setter" pkg="icuas24_competition" type="path_setter.py" arguments="--use-points" output="screen"/>
+    <node name="path_setter" pkg="icuas24_competition" type="path_setter.py" args="--use-points" output="screen"/>
 
     <node name="photo_taker" pkg="icuas24_competition" type="photo_taker.py" output="screen"/> 
 
