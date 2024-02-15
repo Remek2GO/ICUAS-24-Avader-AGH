@@ -123,6 +123,7 @@ class ImageAnalyzer:
                 f"Bed #{image_for_analysis.bed_id} side {image_for_analysis.bed_side} found {sum([side.fruit_count for side in plant_sides])} fruits"
             )
             rospy.loginfo(f"Current fruit count: {self.get_fruit_count(True)}")
+            print(f"Current fruit count: {self.get_fruit_count(True)}")
 
         #self.w_beds.writerow(["test_3,test_3,test_3,test_3"])
 
@@ -149,6 +150,7 @@ class ImageAnalyzer:
 
                 current_fruit_count = self.get_fruit_count()
                 self.current_fruit_count_pub.publish(current_fruit_count)
+                print(f"[!!!] Current fruit count: {current_fruit_count}")
             rate.sleep()
         
 
