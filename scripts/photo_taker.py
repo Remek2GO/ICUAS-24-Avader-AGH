@@ -21,7 +21,7 @@ bridge = CvBridge()
 
 IMAGES_FOLDER_PATH = "/root/sim_ws/src/icuas24_competition/images"
 PROXIMITY_THRESHOLD = 0.5
-YAW_THRESHOLD = np.pi/8
+YAW_THRESHOLD = np.pi/45 #TODO bylo 8
 MAX_IMAGES = 5
 FRAMES_TO_SKIP = 10
 
@@ -50,7 +50,29 @@ class PhotoTaker:
         self.pub_image_taken = rospy.Publisher(self.image_for_analysis_topic, ImageForAnalysis, queue_size=10)
         
     def take_photo_callback(self, msg: Bool):
-        pos_id = self.current_position_id
+        #self.current_odom
+        pos_id = self.current_position_id    
+
+        odom_position = [
+            self.current_odom.pose.pose.position.x, 
+            self.current_odom.pose.pose.position.y, 
+            self.current_odom.pose.pose.position.z, 
+            *euler_from_quaternion([self.current_odom.pose.pose.orientation.x, 
+                                    self.current_odom.pose.pose.orientation.y, 
+                                    self.current_odom.pose.pose.orientation.z, 
+                                    self.current_odom.pose.pose.orientation.w])]
+
+        #poi_position = positions.POINTS_OF_INTEREST[pos_id[0]][pos_id[1]]
+
+        print("[ROLL PITCH YAW] ===")
+        print("[ROLL]" + str(odom_position[-3]/np.pi*180))
+        print("[PITCH]" + str(odom_position[-2]/np.pi*180))
+        print("[YAW]" + str(odom_position[-1]/np.pi*180))
+        print("[ROLL PITCH YAW] ===")
+        #print("[YAW - WANTED]" + str(poi_position[-1]))
+
+        
+        
         if msg.data and not -1 in pos_id:
             img_color = bridge.imgmsg_to_cv2(self.current_color_msg, "bgr8")
             img_depth = bridge.imgmsg_to_cv2(self.current_depth_msg, "8UC1")
@@ -58,6 +80,12 @@ class PhotoTaker:
             unique_id = f"{self.last_position_id[0]}{self.last_position_id[1]}_manual"
             path = f'{IMAGES_FOLDER_PATH}/{unique_id}'
             
+            
+            cv2.putText(img_color, str(odom_position[-3]/np.pi*180) ,(0, 0 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255),  2)
+            cv2.putText(img_color, str(odom_position[-2]/np.pi*180) ,(0, 0 + 50), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255),  2)
+            cv2.putText(img_color, str(odom_position[-1]/np.pi*180) ,(0, 0 + 80), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255),  2)
+
+
             cv2.imwrite(f"{path}_color.png", img_color)
             cv2.imwrite(f"{path}_depth.png", img_depth)
             

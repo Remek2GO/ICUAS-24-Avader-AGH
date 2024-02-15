@@ -3,7 +3,7 @@ from .types import PlantType
 from dataclasses import dataclass
 from copy import deepcopy
 
-SAME_PLANT_THRESHOLD = 0.1
+SAME_PLANT_THRESHOLD = 0.15 #TODO Było 0.1
 
 @dataclass
 class PlantSide:
