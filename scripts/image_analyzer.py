@@ -7,16 +7,27 @@ import csv
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
+import cv2
 import rospy
-from icuas24_competition.msg import ImageForAnalysis
+from sensor_msgs.msg import Image
 from std_msgs.msg import Int32, String
 from typing import List, Dict
+
+from icuas24_competition.msg import ImageForAnalysis
 from scripts.utils.plant_bed import PlantBed
 from scripts.utils.types import PlantType
 from scripts.utils import detect_fruits
-import cv2
+
+IMAGES_FOLDER_PATH = "/root/sim_ws/src/icuas24_competition/images"
 
 DEBUG_MODE = False
+EVAL_MODE = True
+
+if EVAL_MODE:
+    from icuas24_competition.msg import AnalyzerResult
+    from cv_bridge import CvBridge
+
+    bridge = CvBridge()
 
 
 class ImageAnalyzer:
@@ -33,10 +44,15 @@ class ImageAnalyzer:
         self.current_fruit_count_pub = rospy.Publisher(
             "/current_fruit_count", Int32, queue_size=10
         )
-
         self.sub_plants_beds = rospy.Subscriber(
             "/red/plants_beds", String, self.set_fruit_type
         )
+
+        if EVAL_MODE:
+            self.analyzer_result_pub = rospy.Publisher(
+                "/analyzer_result", AnalyzerResult, queue_size=10
+            )
+            self.image_out_pub = rospy.Publisher("/image_out", Image, queue_size=10)
 
         self.f_beds = open(
             "/root/sim_ws/src/icuas24_competition/images/beds_out.csv", "w"
@@ -51,7 +67,9 @@ class ImageAnalyzer:
             print(self.plant_beds.keys())
 
             for bed_id in self.plant_beds.keys():
-                no_pepper = self.plant_beds[bed_id].get_bed_fruit_count(PlantType.PEPPER)
+                no_pepper = self.plant_beds[bed_id].get_bed_fruit_count(
+                    PlantType.PEPPER
+                )
                 no_pepper_l = self.plant_beds[bed_id].get_bed_fruit_count_left(
                     PlantType.PEPPER
                 )
@@ -59,7 +77,9 @@ class ImageAnalyzer:
                     PlantType.PEPPER
                 )
 
-                no_tomato = self.plant_beds[bed_id].get_bed_fruit_count(PlantType.TOMATO)
+                no_tomato = self.plant_beds[bed_id].get_bed_fruit_count(
+                    PlantType.TOMATO
+                )
                 no_tomato_l = self.plant_beds[bed_id].get_bed_fruit_count_left(
                     PlantType.TOMATO
                 )
@@ -113,7 +133,7 @@ class ImageAnalyzer:
             I = cv2.imread(image_for_analysis.img_path_color)
             D = cv2.imread(image_for_analysis.img_path_depth)
 
-            plant_sides, type = detect_fruits.process_frame(I, D)
+            plant_sides, type, out_img = detect_fruits.process_frame(I, D)
             # row = []
             # row.append(image_for_analysis.bed_id)
 
@@ -126,8 +146,19 @@ class ImageAnalyzer:
             if not image_for_analysis.bed_id in self.plant_beds:
                 self.plant_beds[image_for_analysis.bed_id] = PlantBed()
 
-            # Obliczenia dla ew. drugiej strony (korekta)
+            if EVAL_MODE:
+                fruit_cnt = 0
+                for plant_side in plant_sides:
+                    if plant_side.fruit_type == self.fruit_type:
+                        fruit_cnt += plant_side.fruit_count
+                analyzer_result_msg = AnalyzerResult()
+                analyzer_result_msg.bed_id = image_for_analysis.bed_id
+                analyzer_result_msg.bed_side = image_for_analysis.bed_side
+                analyzer_result_msg.fruit_count = fruit_cnt
+                analyzer_result_msg.image = bridge.cv2_to_imgmsg(out_img, "bgr8")
+                self.analyzer_result_pub.publish(analyzer_result_msg)
 
+            # Obliczenia dla ew. drugiej strony (korekta)
             for i, plant_side in enumerate(plant_sides):
                 idx = (
                     i if image_for_analysis.bed_side == 0 else len(plant_sides) - i - 1
@@ -153,6 +184,11 @@ class ImageAnalyzer:
             # self.w_beds.writerow(row)
 
             # rospy.loginfo(f"Plant bed {image_for_analysis.bed_id} updated")
+            # if DEBUG_MODE:
+            #     unique_id = f"{image_for_analysis.bed_id}{image_for_analysis.bed_side}"
+            #     path = f"{IMAGES_FOLDER_PATH}/{unique_id}"
+            #     cv2.imwrite(f"{path}_out.png", out_img)
+
             if DEBUG_MODE:
                 rospy.loginfo(
                     f"Bed #{image_for_analysis.bed_id} side {image_for_analysis.bed_side} found {sum([side.fruit_count for side in plant_sides])} fruits"
