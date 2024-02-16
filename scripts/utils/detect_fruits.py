@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import cv2
 import numpy as np
 from .plant_bed import PlantSideCount
@@ -31,6 +29,7 @@ h_min, h_max = 0, 179
 s_min, s_max = 0, 255
 v_min, v_max = 0, 255
 light = 100
+
 
 
 def process_patch(patch):
