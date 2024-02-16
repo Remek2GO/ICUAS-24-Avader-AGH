@@ -26,20 +26,26 @@ class A_star:
 
     def MST(self, setpoint):
 
+        # print("MST")
         open_list_copy = copy.copy(self.open_list)
-        open_list_copy.remove(setpoint)
+
+        # open_list_copy.remove(setpoint) # nie usuwanie wybranego punktu
         N = open_list_copy
+        # print("Open list copy (update): ", open_list_copy)
         selected_node = np.zeros(len(N))
         no_edge = 0
         selected_node[0] = True
         sum_weights = 0
-
+        a = 0
+        b = 0
         while no_edge < len(N) - 1:
 
             minimum = np.inf
             a = 0
             b = 0
             for m in N:
+                # print("M: ", m)
+                # print("Selected node: ", selected_node[N.index(m)], "N index: ", N.index(m))
                 if selected_node[N.index(m)]:
                     for n in N:
                         if not selected_node[N.index(n)]:
@@ -47,9 +53,17 @@ class A_star:
                                 minimum = self.heuristic_distances[m][n]
                                 a = m
                                 b = n
+            # print("A: ", a, "B: ", b)
+
             sum_weights += self.heuristic_distances[a][b]
             selected_node[N.index(b)] = True
             no_edge += 1
+            # print("Sum weights: ", sum_weights)
+
+        # Dodanie dystansu od ostatniego punktu do punktu poczatkowego/docelowego
+        sum_weights += self.heuristic_distances[b][0]
+    
+
         return sum_weights
 
     def search_path(self, LOCALIZATION):
@@ -59,38 +73,55 @@ class A_star:
 
         for setpoint in self.setpoints.keys():
             self.open_list.append(setpoint)
+        # print("Open list: ", self.open_list)
+        
         self.open_list.remove(current_node)
         self.open_list.remove(current_node + 1)
 
         while not end_found:
             f_cost = {}
-
+            # print(self.heuristic_distances)
             if DEBUG_MODE:
                 print("\n Aktualna pozycja: ", current_node / 2, " \n")
             if len(self.open_list) != 1:
+                # print("Open list: ", self.open_list)
                 for setpoint in self.open_list:
-                    h_cost = self.MST(setpoint)
+                    h_cost = self.MST(setpoint) # ??
+                    # print("Setpoint: ", setpoint / 2)
+                    # print("MST: ", h_cost)
                     open_list_copy = copy.copy(self.open_list)
                     open_list_copy.remove(setpoint)
                     min_cost = np.inf
-                    for point in open_list_copy:
+                    for point in open_list_copy: # not used
                         if self.heuristic_distances[point][0] < min_cost:
                             min_cost = self.heuristic_distances[point][0]
-                    if (
-                        LOCALIZATION[np.floor(setpoint / 2)][setpoint % 2][2]
-                        == LOCALIZATION[np.floor(current_node / 2)][current_node % 2][2]
-                    ):
-                        h_cost = h_cost - 3
-                    if (
-                        LOCALIZATION[np.floor(setpoint / 2)][setpoint % 2][5]
-                        == LOCALIZATION[np.floor(current_node / 2)][current_node % 2][5]
-                    ):
-                        h_cost = h_cost - 0.1
-                    if (
-                        LOCALIZATION[np.floor(setpoint / 2)][setpoint % 2][0]
-                        != LOCALIZATION[np.floor(current_node / 2)][current_node % 2][0]
-                    ):
-                        h_cost = h_cost + 1
+
+                    # print("Min cost: ", min_cost)
+                    # print("idx01 ", np.floor(setpoint / 2))
+                    # print("idx02 ", np.floor(current_node / 2))
+                    # print("idx11 ", setpoint % 2)
+                    # print("idx12 ", current_node % 2)
+
+                    # current_node % 2 == 0 -- lewa strona
+                    # current_node % 2 == 1 -- prawa strona
+                    # if (
+                    #     LOCALIZATION[np.floor(setpoint / 2)][setpoint % 2][2]
+                    #     == LOCALIZATION[np.floor(current_node / 2)][current_node % 2][2]                                                                                            
+                    # ): # to sama wysoksoc - wspolrzedna Z
+                    #     h_cost = h_cost - 3
+                    #     print("Minus 3")
+                    # if (
+                    #     LOCALIZATION[np.floor(setpoint / 2)][setpoint % 2][5]
+                    #     == LOCALIZATION[np.floor(current_node / 2)][current_node % 2][5]
+                    # ): # to samo obrocenie - wspolrzedna Yaw
+                    #     h_cost = h_cost - 0.1
+                    #     print("Minus 0.1")
+                    # if (
+                    #     LOCALIZATION[np.floor(setpoint / 2)][setpoint % 2][0] != LOCALIZATION[np.floor(current_node / 2)][current_node % 2][0]
+                    # ): # to inna pozycja X
+                    #     h_cost = h_cost + 1
+                    #     print("Plus 1")
+
                     f_cost.update(
                         {
                             setpoint: g_cost
@@ -102,9 +133,9 @@ class A_star:
                         print(
                             setpoint / 2,
                             " - ",
-                            g_cost
-                            + self.heuristic_distances[current_node][setpoint]
-                            + h_cost,
+                            g_cost,
+                            self.heuristic_distances[current_node][setpoint],
+                            h_cost,
                         )
 
                 next_node = min(f_cost, key=f_cost.get)
@@ -112,6 +143,9 @@ class A_star:
                 self.open_list.remove(next_node)
                 self.close_list.append(next_node)
                 g_cost += self.heuristic_distances[current_node][next_node]
+                # print("Next node: ", next_node)
+                # print("g_cost: ", g_cost)
+                # print("Heuristic: ",self.heuristic_distances[current_node][next_node])
                 current_node = next_node
             else:
                 next_node = self.open_list[0]
