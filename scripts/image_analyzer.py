@@ -7,14 +7,16 @@ import csv
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
+import cv2
 import rospy
-from icuas24_competition.msg import ImageForAnalysis
+from sensor_msgs.msg import Image
 from std_msgs.msg import Int32, String
 from typing import List, Dict
+
+from icuas24_competition.msg import ImageForAnalysis
 from scripts.utils.plant_bed import PlantBed
 from scripts.utils.types import PlantType
 from scripts.utils import detect_fruits
-import cv2
 
 IMAGES_FOLDER_PATH = "/root/sim_ws/src/icuas24_competition/images"
 
@@ -23,6 +25,9 @@ EVAL_MODE = True
 
 if EVAL_MODE:
     from icuas24_competition.msg import AnalyzerResult
+    from cv_bridge import CvBridge
+
+    bridge = CvBridge()
 
 
 class ImageAnalyzer:
@@ -47,6 +52,7 @@ class ImageAnalyzer:
             self.analyzer_result_pub = rospy.Publisher(
                 "/analyzer_result", AnalyzerResult, queue_size=10
             )
+            self.image_out_pub = rospy.Publisher("/image_out", Image, queue_size=10)
 
         self.f_beds = open(
             "/root/sim_ws/src/icuas24_competition/images/beds_out.csv", "w"
@@ -149,6 +155,7 @@ class ImageAnalyzer:
                 analyzer_result_msg.bed_id = image_for_analysis.bed_id
                 analyzer_result_msg.bed_side = image_for_analysis.bed_side
                 analyzer_result_msg.fruit_count = fruit_cnt
+                analyzer_result_msg.image = bridge.cv2_to_imgmsg(out_img, "bgr8")
                 self.analyzer_result_pub.publish(analyzer_result_msg)
 
             # Obliczenia dla ew. drugiej strony (korekta)
@@ -177,10 +184,10 @@ class ImageAnalyzer:
             # self.w_beds.writerow(row)
 
             # rospy.loginfo(f"Plant bed {image_for_analysis.bed_id} updated")
-            if EVAL_MODE or DEBUG_MODE:
-                unique_id = f"{image_for_analysis.bed_id}{image_for_analysis.bed_side}"
-                path = f"{IMAGES_FOLDER_PATH}/{unique_id}"
-                cv2.imwrite(f"{path}_out.png", out_img)
+            # if DEBUG_MODE:
+            #     unique_id = f"{image_for_analysis.bed_id}{image_for_analysis.bed_side}"
+            #     path = f"{IMAGES_FOLDER_PATH}/{unique_id}"
+            #     cv2.imwrite(f"{path}_out.png", out_img)
 
             if DEBUG_MODE:
                 rospy.loginfo(
