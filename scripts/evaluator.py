@@ -224,6 +224,12 @@ class Evaluator:
 
 
 if __name__ == "__main__":
+    myargv = rospy.myargv(argv=sys.argv)
+    if len(myargv) < 2:
+        rospy.logerr("[Evaluator] Please provide the path to the plant beds CSV file.")
+        sys.exit(1)
+    beds_csv_path = myargv[1]
+
     rospy.init_node("evaluator")
-    Evaluator("/root/sim_ws/src/icuas24_competition/beds.csv")
+    Evaluator(beds_csv_path)
     rospy.spin()

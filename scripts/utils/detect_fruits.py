@@ -10,7 +10,7 @@ from typing import List, Tuple
 # TODO -
 
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 kernel_3 = np.ones((5, 5), np.uint8)
 
