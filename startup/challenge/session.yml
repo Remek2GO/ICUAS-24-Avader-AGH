@@ -24,13 +24,13 @@ windows:
         - waitForRos; roslaunch ardupilot_gazebo kopterworx.launch
           use_sim_time:=true
           x:=1 y:=1
-          world:=$(rospack find icuas24_competition)/worlds/full_of_fruits.world
+          world:=$(rospack find icuas24_competition)/worlds/initial_setup.world
         # - waitForRos; waitForSimulation; rosrun rqt_gui rqt_gui
         - |
           waitForRos
           waitForSimulation
           sleep 2          
-          rostopic pub --latch /$UAV_NAMESPACE/plants_beds std_msgs/String "Eggplant 1 6 13 15 17 19 25"
+          rostopic pub --latch /$UAV_NAMESPACE/plants_beds std_msgs/String "Pepper 10 11 14 21 23 24"
   - arm&takeof:
       layout: tiled
       panes:

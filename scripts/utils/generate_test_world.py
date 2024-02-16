@@ -37,6 +37,9 @@ vege = [["plant",0,0,0],
         ]
 
 
+
+
+
 #roslaunch icuas24_competition spawn_plant.launch name:=plant1 model_name:=pepper_1 x:=4.0 y:=4.5 z:=6.699999999999999 yaw:=1.5707
 
 #
