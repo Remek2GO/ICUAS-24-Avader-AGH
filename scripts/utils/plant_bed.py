@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """Helper classes to work with plant beds."""
 
 import numpy as np
@@ -7,9 +8,10 @@ from dataclasses import dataclass
 
 from .types import PlantType
 
-SAME_PLANT_THRESHOLD = 0.15 #TODO Było 0.1
+SAME_PLANT_THRESHOLD = 0.15  # TODO Było 0.1
 
 DEBUG_MODE = False
+
 
 @dataclass
 class PlantSideCount:

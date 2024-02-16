@@ -28,6 +28,7 @@ from icuas24_competition.msg import UavSetpoint
 
 DEBUG_MODE = False
 
+
 class PathSetter:
     """Class to set the path for the tracker to follow."""
 
@@ -78,7 +79,6 @@ class PathSetter:
             self.challenge_started = True
 
         self.flight_time = rospy.get_time()
-        
 
     def _set_current_fruit_count_clb(self, data: Int32):
         self.current_fruit_count = data.data
@@ -231,11 +231,11 @@ class PathSetter:
 
         This method publishes the final fruit count to the `/fruit_count` topic.
         """
-        rospy.loginfo("Challenge completed")
+        rospy.loginfo("[Path Setter] Challenge completed")
         self.pub_fruit_count.publish(self.current_fruit_count)
 
         self.flight_time = rospy.get_time() - self.flight_time
-        rospy.loginfo(f"Flight Time: {self.flight_time}" )
+        rospy.loginfo(f"[Path Setter] Flight Time: {self.flight_time}")
 
 
 if __name__ == "__main__":

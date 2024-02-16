@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """Types definition for the project."""
 
 from enum import Enum

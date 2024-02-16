@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """Helper functions to work with beds positions."""
 
 import numpy as np
