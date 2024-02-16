@@ -21,24 +21,26 @@ number_of_columns = 3
 number_of_shelfs = 3
 number_of_plants = 3
 
-# roslinka suma warzyw, lewa prawa (ile jest widocznych)
-vege = [
-    ["plant", 0, 0, 0],
-    ["eggplant_1", 1, 1, 0],
-    ["eggplant_2", 2, 2, 1],  # TODO Sprawdzic
-    ["eggplant_3", 3, 2, 1],
-    ["eggplant_4", 3, 3, 2],  # TODO Sprawdzic
-    ["pepper_1", 1, 1, 1],
-    ["pepper_2", 4, 4, 4],
-    ["pepper_3", 3, 2, 1],
-    ["pepper_4", 4, 2, 2],
-    ["tomato_1", 1, 1, 1],
-    ["tomato_2", 2, 2, 1],
-    ["tomato_3", 3, 3, 0],
-]
+#roslinka suma warzyw, lewa prawa (ile jest widocznych)
+vege = [["plant",0,0,0],
+        ["eggplant_1",1,1,0],
+        ["eggplant_2",2,2,1],    #TODO Sprawdzic
+        ["eggplant_3",3,2,1],    
+        ["eggplant_4",3,3,2],    #TODO Sprawdzic
+        ["pepper_1",1,1,1],
+        ["pepper_2",4,4,4],
+        ["pepper_3",3,2,1],
+        ["pepper_4",4,2,2],
+        ["tomato_1",1,1,1],
+        ["tomato_2",2,2,1],
+        ["tomato_3",3,3,0]              
+        ]
 
 
-# roslaunch icuas24_competition spawn_plant.launch name:=plant1 model_name:=pepper_1 x:=4.0 y:=4.5 z:=6.699999999999999 yaw:=1.5707
+
+
+
+#roslaunch icuas24_competition spawn_plant.launch name:=plant1 model_name:=pepper_1 x:=4.0 y:=4.5 z:=6.699999999999999 yaw:=1.5707
 
 #
 # Orignialny przelot

@@ -10,7 +10,7 @@ from typing import List, Tuple
 # TODO -
 
 
-DEBUG_MODE = False
+DEBUG_MODE = True
 
 kernel_3 = np.ones((5, 5), np.uint8)
 
@@ -258,7 +258,7 @@ def process_frame(I, D, debug=False) -> Tuple[List[PlantSideCount], int, np.ndar
     if DEBUG_MODE:
         cv2.imshow("Detection results", I)
         cv2.startWindowThread()
-        cv2.waitKey(1)
+        cv2.waitKey(0)
 
     return plant_sides, type, I
 

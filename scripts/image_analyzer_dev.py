@@ -25,5 +25,5 @@ if __name__ == "__main__":
         I = cv2.imread(os.path.join(img_path, c + "_manual_color.png"))
         D = cv2.imread(os.path.join(img_path, c + "_manual_depth.png"))
 
-        plant_sides, type = detect_fruits.process_frame(I, D)
+        plant_sides, type = detect_fruits.process_frame(I, D, debug=True)
     cv2.destroyAllWindows() 
