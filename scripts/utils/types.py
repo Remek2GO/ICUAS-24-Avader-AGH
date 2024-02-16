@@ -72,6 +72,14 @@ class PlantBedsIds:
     plant_type: PlantType
     bed_ids: List[int]
 
+    def __str__(self) -> str:
+        """Return the string representation of the plant beds ids.
+
+        Returns:
+            str: The string representation of the plant beds ids.
+        """
+        return f"Type: {self.plant_type}\nBeds: {self.bed_ids}"
+
 
 @dataclass
 class Setpoint:

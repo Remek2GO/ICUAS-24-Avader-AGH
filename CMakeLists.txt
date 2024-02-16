@@ -51,6 +51,7 @@ catkin_python_setup()
 ## Generate messages in the 'msg' folder
 add_message_files(
   FILES
+  AnalyzerResult.msg
   ImageForAnalysis.msg
   UavSetpoint.msg
 )
@@ -164,9 +165,10 @@ include_directories(
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
+  scripts/evaluator.py
+  scripts/image_analyzer.py
   scripts/path_setter.py
   scripts/photo_taker.py
-  scripts/image_analyzer.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

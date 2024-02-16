@@ -31,7 +31,6 @@ v_min, v_max = 0, 255
 light = 100
 
 
-
 def process_patch(patch):
     count = -1
     type = -1
@@ -182,7 +181,7 @@ def get_patches(masked_result):
 
 # Przetwarzanie pojedycznej ramki
 # obraz RGB i odpowiadajaca mapa glebi
-def process_frame(I, D, debug=False) -> Tuple[List[PlantSideCount], int]:
+def process_frame(I, D, debug=False) -> Tuple[List[PlantSideCount], int, np.ndarray]:
 
     # Maska smigla
     I = preprocess_color_image(I)
@@ -261,7 +260,7 @@ def process_frame(I, D, debug=False) -> Tuple[List[PlantSideCount], int]:
         cv2.startWindowThread()
         cv2.waitKey(1)
 
-    return plant_sides, type
+    return plant_sides, type, I
 
 
 if __name__ == "__main__":
