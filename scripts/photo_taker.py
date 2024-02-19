@@ -33,6 +33,7 @@ FRAMES_TO_SKIP = 10
 
 DEBUG_MODE = False
 
+
 class PhotoTaker:
     """Class to take photos of the plants."""
 

@@ -7,14 +7,19 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
 import csv
+import cv2
 from dataclasses import dataclass
 from typing import Dict, List
 
 import rospy
+from cv_bridge import CvBridge
 from std_msgs.msg import Bool, Int32, String
 
 from icuas24_competition.msg import AnalyzerResult
 from scripts.utils.types import PlantBedsIds, PlantType
+
+IMAGES_FOLDER_PATH = "/root/sim_ws/src/icuas24_competition/images"
+BRIDGE = CvBridge()
 
 
 @dataclass
@@ -113,6 +118,10 @@ class Evaluator:
 
         # Check if the UAV found the proper number of fruits
         gt = None
+        img_save_path = os.path.join(
+            IMAGES_FOLDER_PATH, f"{msg.bed_id}{msg.bed_side}_out.png"
+        )
+        img_out = BRIDGE.imgmsg_to_cv2(msg.image, "bgr8")
         if msg.bed_side == 0:
             gt = self.beds_gt[msg.bed_id].left_fruits
         elif msg.bed_side == 1:
@@ -124,11 +133,31 @@ class Evaluator:
                 rospy.loginfo(
                     f"[Evaluator] ({msg.bed_id}, {msg.bed_side}): Correct {gt}."
                 )
+                cv2.putText(
+                    img_out,
+                    f"{self.plant_beds_ids.plant_type} {msg.fruit_count} - CORRECT",
+                    (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1,
+                    (0, 255, 0),
+                    2,
+                )
             else:
                 rospy.logerr(
                     f"[Evaluator] ({msg.bed_id}, {msg.bed_side}): Incorrect \
                         {msg.fruit_count} [GT: {gt}]."
                 )
+                cv2.putText(
+                    img_out,
+                    f"{self.plant_beds_ids.plant_type} {msg.fruit_count} - ERROR \
+                    [GT: {gt}]",
+                    (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1,
+                    (0, 0, 255),
+                    2,
+                )
+            cv2.imwrite(img_save_path, img_out)
 
     def _challenge_started_clb(self, msg: Bool):
         self.start_time = rospy.get_time()
@@ -195,6 +224,12 @@ class Evaluator:
 
 
 if __name__ == "__main__":
+    myargv = rospy.myargv(argv=sys.argv)
+    if len(myargv) < 2:
+        rospy.logerr("[Evaluator] Please provide the path to the plant beds CSV file.")
+        sys.exit(1)
+    beds_csv_path = myargv[1]
+
     rospy.init_node("evaluator")
-    Evaluator("/root/sim_ws/src/icuas24_competition/beds.csv")
+    Evaluator(beds_csv_path)
     rospy.spin()

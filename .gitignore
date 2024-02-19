@@ -4,3 +4,4 @@ __pycache__/
 
 # VS Code
 .vscode/
+test.py
