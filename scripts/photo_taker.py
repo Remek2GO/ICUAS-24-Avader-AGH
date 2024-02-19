@@ -26,8 +26,8 @@ from scripts.utils.types import Setpoint
 bridge = CvBridge()
 
 IMAGES_FOLDER_PATH = "/root/sim_ws/src/icuas24_competition/images"
-PROXIMITY_THRESHOLD = 0.1
-YAW_THRESHOLD = np.pi / 180
+PROXIMITY_THRESHOLD = 0.1   #0.1
+YAW_THRESHOLD = np.pi / 180   #pi / 180
 MAX_IMAGES = 5
 FRAMES_TO_SKIP = 10
 
@@ -135,6 +135,7 @@ class PhotoTaker:
         distance = np.linalg.norm(np.array(odom_position[:3]) - np.array(poi[:3]))
         yaw_diff = np.abs(odom_position[-1] - poi[-1])
 
+
         if DEBUG_MODE:
             rospy.loginfo(
                 f"[Photo Taker] ({bed_id}, {bed_side}) Distance: {distance}, \
@@ -155,14 +156,16 @@ class PhotoTaker:
             Otherwise, it publishes the position hold setpoint to move the drone \
             closer to the point of interest.
         """
+     
         while not rospy.is_shutdown():
+            
             if self.take_photo:
                 close_enaugh, bed_id, bed_side = self.is_close_to_position()
                 if bed_id == -1 or bed_side == -1:
                     self.take_photo = False
                     self.pub_move_on.publish(Bool(True))
                 else:
-                    if close_enaugh:
+                    if close_enaugh:  # close_enaugh:
                         self.take_photo = False
                         self.pub_move_on.publish(Bool(True))
 
@@ -170,12 +173,32 @@ class PhotoTaker:
                         img_color = bridge.imgmsg_to_cv2(self.current_color_msg, "bgr8")
                         img_depth = bridge.imgmsg_to_cv2(self.current_depth_msg, "8UC1")
 
-                        unique_id = f"{bed_id}{bed_side}_manual"
+                        odom_position = [
+                            self.current_odom.pose.pose.position.x,
+                            self.current_odom.pose.pose.position.y,
+                            self.current_odom.pose.pose.position.z,
+                            *euler_from_quaternion(
+                                [
+                                    self.current_odom.pose.pose.orientation.x,
+                                    self.current_odom.pose.pose.orientation.y,
+                                    self.current_odom.pose.pose.orientation.z,
+                                    self.current_odom.pose.pose.orientation.w,
+                                ]
+                            ),
+                        ]
+                       
+
+                        unique_id = f"{bed_id}{bed_side}{ii}_manual"
                         path = f"{IMAGES_FOLDER_PATH}/{unique_id}"
 
                         # if DEBUG_MODE:
                         cv2.imwrite(f"{path}_color.png", img_color)
                         cv2.imwrite(f"{path}_depth.png", img_depth)
+
+                        f = open("{path}_odom.txt","w")
+                        t = str(odom_position[0]) + str(odom_position[1]) + str(odom_position[2]) + str(odom_position[3]) + str(odom_position[4]) + str(odom_position[5])
+                        f.write(t)
+                        f.close()
 
                         img_msg = ImageForAnalysis()
                         img_msg.img_path_color = f"{path}_color.png"

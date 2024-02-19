@@ -169,6 +169,8 @@ catkin_install_python(PROGRAMS
   scripts/image_analyzer.py
   scripts/path_setter.py
   scripts/photo_taker.py
+  scripts/photo_logger.py
+  
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
