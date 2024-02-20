@@ -26,8 +26,8 @@ from scripts.utils.types import Setpoint
 bridge = CvBridge()
 
 IMAGES_FOLDER_PATH = "/root/sim_ws/src/icuas24_competition/images"
-PROXIMITY_THRESHOLD = 0.1   #0.1
-YAW_THRESHOLD = np.pi / 180   #pi / 180
+PROXIMITY_THRESHOLD = 0.1  # 0.1
+YAW_THRESHOLD = np.pi / 180  # pi / 180
 MAX_IMAGES = 5
 FRAMES_TO_SKIP = 10
 
@@ -64,7 +64,7 @@ class PhotoTaker:
         )
         self.pub_move_on = rospy.Publisher("/move_on", Bool, queue_size=10)
         self.pub_position_hold = rospy.Publisher(
-            "/position_hold/trajectory", MultiDOFJointTrajectoryPoint, queue_size=10
+            "/red/position_hold/trajectory", MultiDOFJointTrajectoryPoint, queue_size=10
         )
 
     def _image_color_clb(self, msg: Image):
@@ -157,7 +157,7 @@ class PhotoTaker:
             closer to the point of interest.
         """
         while not rospy.is_shutdown():
-            
+
             if self.take_photo:
                 close_enaugh, bed_id, bed_side = self.is_close_to_position()
                 if bed_id == -1 or bed_side == -1:

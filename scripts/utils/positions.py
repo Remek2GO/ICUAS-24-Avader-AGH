@@ -42,6 +42,10 @@ POINTS_OF_INTEREST = {
     27: [[13, 21, 7.4, 0, 0, 0], [19, 21, 7.4, 0, 0, np.pi]],
 }
 
+ALL_POINTS_OF_INTEREST = [p[0] for p in POINTS_OF_INTEREST.values()] + [
+    p[1] for p in POINTS_OF_INTEREST.values()
+]
+
 
 def get_distance(p1_indeces: Tuple[int, int], p2_indeces: Tuple[int, int]) -> float:
     """Calculate the distance between two points of interest.
