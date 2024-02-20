@@ -1,8 +1,12 @@
+"""Helper functions for counting fruits."""
+
 import cv2
 import numpy as np
+from typing import List, Tuple
+
+from .inflight_image_analysis import Patch
 from .plant_bed import PlantSideCount
 from .types import PlantType
-from typing import List, Tuple
 
 # TODO - doczytac jak maja wygladac te owoce i czy sa jakies ograniczenia.
 # TODO - inne przestrzenie barw
@@ -14,11 +18,12 @@ DEBUG_MODE = False
 
 kernel_3 = np.ones((5, 5), np.uint8)
 
-fruite_type = ["tomato", "eggplant", "pepper"]
-
+FRUIT_TYPE_ENCODING = ["tomato", "eggplant", "pepper"]
 
 # TODO Warto by na te progi jeszcze raz zerknać
-th = [
+# Thresholds in HSV color space for each fruit type
+# Each threshold is a list of 6 values: [H_min, H_max, S_min, S_max, V_min, V_max]
+HSV_THRESHOLDS = [
     [0, 10, 5, 255, 140, 255],
     [90, 150, 180, 255, 50, 255],
     [20, 35, 175, 255, 90, 255],
@@ -31,12 +36,21 @@ v_min, v_max = 0, 255
 light = 100
 
 
-def process_patch(patch):
+def process_patch(patch: Patch) -> Tuple[int, int, np.ndarray]:
+    """Process the patch to detect the fruits.
+
+    Args:
+        patch (Patch): The patch of the HSV image.
+
+    Returns:
+        Tuple[int, int, np.ndarray]: The number of fruits, the type of the fruit, \
+            and the centers of the fruits.
+    """
     count = -1
-    type = -1
+    fruit_id = -1
     centers = []
     for k in range(0, 3):
-        t = th[k]
+        t = HSV_THRESHOLDS[k]
         mask = cv2.inRange(patch, (t[0], t[2], t[4]), (t[1], t[3], t[5]))
         # maskStacked = np.stack([mask, mask, mask], axis=-1)
         # merg = cv2.hconcat([imageCopy, maskStacked, cv2.bitwise_and(imageCopy, imageCopy, mask=mask)])
@@ -53,33 +67,32 @@ def process_patch(patch):
         # cv2.imshow("Mask", mask)
         # cv2.waitKey(0)
 
-        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(mask)
+        num_labels, _, stats, _ = cv2.connectedComponentsWithStats(mask)
         fruit_count = 0
         for i in range(1, num_labels):
             left, top, width, height, area = stats[i]
             bbox_area = width * height
 
-            if DEBUG_MODE:
-                print(bbox_area, "|", area, "|", area / bbox_area)
+            # print(bbox_area, "|", area, "|", area / bbox_area)
             if bbox_area > 200 and area > 100:
                 mask_small = mask[top : top + height, left : left + width]
                 dist = cv2.distanceTransform(mask_small, cv2.DIST_L2, 3)
                 cv2.normalize(dist, dist, 0, 1.0, cv2.NORM_MINMAX)
 
                 # Threshold
-                ret, dist_th = cv2.threshold(dist, 0.70, 255, cv2.THRESH_BINARY)
+                _, dist_th = cv2.threshold(dist, 0.70, 255, cv2.THRESH_BINARY)
                 dist_th = np.uint8(dist_th)
 
                 # cv2.imshow("Dist T", dist_th)
                 # cv2.waitKey(0)
 
-                num_labels_small, labels_small, stats_small, centroids_small = (
+                num_labels_small, _, stats_small, centroids_small = (
                     cv2.connectedComponentsWithStats(dist_th)
                 )
                 # print("Liczba malych obiektow" + str(num_labels_small))
 
                 for ii in range(1, num_labels_small):
-                    left_s, top_s, width_s, height_s, area_s = stats_small[ii]
+                    _, _, _, _, area_s = stats_small[ii]
                     # print("Small area" + str(area_s))
                     if area_s > 10:
                         fruit_count += 1
@@ -93,16 +106,16 @@ def process_patch(patch):
                 # for ii in range(1, num_labels_small):
                 # TODO Do sprawdzenia
 
-                # Tu wyliczamy dwa centoridy - robimy erozję dopóki nam się to nie rodzieli
+                # Tu wyliczamy dwa centoridy - robimy erozję dopóki nam się to nie rozdzieli
 
         # Tu jest założenie, że nie ma krzaków mulitruit :)
         if fruit_count > 0:
             count = fruit_count
-            type = k
+            fruit_id = k
 
     centers = np.array(centers)
 
-    return (count, type, centers)
+    return (count, fruit_id, centers)
 
 
 def preprocess_color_image(I):
@@ -170,10 +183,10 @@ def get_patches(masked_result):
                 patches.append((top, top + height, left, left + width))
 
                 # if (count >0 ):
-                #   text = f"{count} {fruite_type[type]}"
+                #   text = f"{count} {FRUIT_TYPE_ENCODING[type]}"
 
                 #   cv2.putText(I, text, (left, top + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0,0,255), 2)
-                #   print(count," ",fruite_type[type])
+                #   print(count," ",FRUIT_TYPE_ENCODING[type])
 
         # cv2.imshow("B", B)
     return patches
@@ -226,7 +239,7 @@ def process_frame(I, D, debug=False) -> Tuple[List[PlantSideCount], int, np.ndar
         )
 
         if count > 0:
-            text = f"{count} {fruite_type[type]}"
+            text = f"{count} {FRUIT_TYPE_ENCODING[type]}"
             cv2.putText(
                 I,
                 text,
@@ -253,7 +266,7 @@ def process_frame(I, D, debug=False) -> Tuple[List[PlantSideCount], int, np.ndar
             if type == -1:
                 print(count, " ", "empty", " ")
             else:
-                print(count, " ", fruite_type[type], " ")
+                print(count, " ", FRUIT_TYPE_ENCODING[type], " ")
 
     if DEBUG_MODE:
         cv2.imshow("Detection results", I)

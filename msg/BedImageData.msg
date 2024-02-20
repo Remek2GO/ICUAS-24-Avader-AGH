@@ -7,4 +7,4 @@ bool enaugh_data                    # 0: not enough images for the (bed_id, bed_
 
 sensor_msgs/Image img_color         # RGB image
 sensor_msgs/Image img_depth         # Depth image
-geometry_msgs/Pose odom_data        # Pose of the UAV when the image was taken
+UavSetpoint odom_data               # Pose of the UAV when the image was taken

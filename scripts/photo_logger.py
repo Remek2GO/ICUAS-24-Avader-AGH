@@ -221,9 +221,15 @@ class PhotoLogger:
                 img_data_msg.enaugh_data = enaugh_data
                 img_data_msg.img_color = self.current_color_msg
                 img_data_msg.img_depth = self.current_depth_msg
+                img_data_msg.odom_data.x = odom_data[0]
+                img_data_msg.odom_data.y = odom_data[1]
+                img_data_msg.odom_data.z = odom_data[2]
+                img_data_msg.odom_data.roll = odom_data[3]
+                img_data_msg.odom_data.pitch = odom_data[4]
+                img_data_msg.odom_data.yaw = odom_data[5]
                 self.pub_bed_image_data.publish(img_data_msg)
 
-                rospy.loginfo(
+                rospy.logdebug(
                     f"[Photo Logger] ({bed_id}, {bed_side}) Data saved: "
                     f"{self.bed_images[(bed_id, bed_side)]}/{self.max_images}"
                 )
