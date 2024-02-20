@@ -9,7 +9,7 @@ sys.path.append(BASE_DIR)
 
 import cv2
 import numpy as np
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
 import rospy
 from cv_bridge import CvBridge
@@ -17,19 +17,17 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Image
 from tf.transformations import euler_from_quaternion
 
-from icuas24_competition.msg import BedImageData, DestinationBedView
+from icuas24_competition.msg import BedImageData, BedViewArray
 from scripts.utils.positions import POINTS_OF_INTEREST
 
 bridge = CvBridge()
 
 IMAGES_FOLDER_PATH = "/root/sim_ws/src/icuas24_competition/images_eval"
-NO_BEDS = 27
-NO_SIDES = 2
 PROXIMITY_THRESHOLD = 0.1  # 0.1
 ROLL_IDX = 3
-ROLL_THRESHOLD = np.pi / 180
+ROLL_THRESHOLD = np.pi / 45
 YAW_IDX = 5
-YAW_THRESHOLD = np.pi / 180
+YAW_THRESHOLD = np.pi / 45
 
 
 class PhotoLogger:
@@ -47,13 +45,10 @@ class PhotoLogger:
         self.current_depth_msg: Image = None
         self.current_odom: Odometry = None
         self.rate = rospy.Rate(frequency)
-        self.bed_images: Dict[Tuple[int, int], int] = {
-            (bed_id, bed_side): 0
-            for bed_id in range(1, NO_BEDS + 1)
-            for bed_side in range(NO_SIDES)
-        }
-        self.current_bed_view: Tuple[int, int] = None
         self.max_images = max_images
+        self.bed_view_order: List[Tuple[int, int]] = None
+        self.bed_images: Dict[Tuple[int, int], int] = None
+        self.current_bed_view_idx: int = None
 
         # ROS publishers and subscribers
         self.pub_bed_image_data = rospy.Publisher(
@@ -61,16 +56,26 @@ class PhotoLogger:
         )
 
         rospy.Subscriber(
-            "/avader/destination_bed_view",
-            DestinationBedView,
-            self._destination_bed_view_clb,
+            "/avader/bed_views",
+            BedViewArray,
+            self._bed_views_clb,
         )
         rospy.Subscriber("/red/camera/depth/image_raw", Image, self._image_depth_clb)
         rospy.Subscriber("/red/camera/color/image_raw", Image, self._image_color_clb)
         rospy.Subscriber("/red/odometry", Odometry, self._odom_clb)
 
-    def _destination_bed_view_clb(self, msg: DestinationBedView):
-        self.current_bed_view = (msg.bed_id, msg.bed_side)
+    def _bed_views_clb(self, msg: BedViewArray):
+        if len(msg.bed_views) == 0:
+            rospy.logerr("[Photo Logger] Received no bed views.")
+            return
+        self.bed_view_order = [
+            (bed_view.bed_id, bed_view.bed_side) for bed_view in msg.bed_views
+        ]
+        self.bed_images = {
+            (bed_view.bed_id, bed_view.bed_side): 0 for bed_view in msg.bed_views
+        }
+        self.current_bed_view_idx = 0
+        rospy.loginfo(f"[Photo Logger] Bed views received: {self.bed_view_order}")
 
     def _image_color_clb(self, msg: Image):
         self.current_color_msg = msg
@@ -91,7 +96,7 @@ class PhotoLogger:
             self.current_color_msg is not None
             and self.current_depth_msg is not None
             and self.current_odom is not None
-            and self.current_bed_view is not None
+            and self.current_bed_view_idx is not None
         )
 
     def run(self):
@@ -105,7 +110,10 @@ class PhotoLogger:
 
         # Main loop
         rospy.loginfo("[Photo Logger] Entering main loop.")
-        while not rospy.is_shutdown():
+        while (
+            not rospy.is_shutdown() 
+            and self.current_bed_view_idx < len(self.bed_view_order)
+        ):
             # Get distances from odom_position to all points of interest
             odom_data = np.array(
                 [
@@ -123,26 +131,49 @@ class PhotoLogger:
                 ]
             )
 
-            # Get the point of interest
-            poi = POINTS_OF_INTEREST[self.current_bed_view[0]][self.current_bed_view[1]]
-            poi_diff = odom_data - np.array(poi)
-            distance = np.linalg.norm(poi_diff[:3])
-            roll_diff = np.abs(poi_diff[ROLL_IDX])
-            yaw_diff = np.abs(poi_diff[YAW_IDX])
+            # Check if the UAV is close to the next bed view than the current one
+            bed_view = self.bed_view_order[self.current_bed_view_idx]
+            distance = np.linalg.norm(
+                odom_data[:3]
+                - np.array(POINTS_OF_INTEREST[bed_view[0]][bed_view[1]][:3])
+            )
+            yaw_diff = np.abs(
+                odom_data[YAW_IDX]
+                - POINTS_OF_INTEREST[bed_view[0]][bed_view[1]][YAW_IDX]
+            )
+            if self.current_bed_view_idx < len(self.bed_view_order) - 1:
+                next_bed_view = self.bed_view_order[self.current_bed_view_idx + 1]
+                distance_next = np.linalg.norm(
+                    odom_data[:3]
+                    - np.array(POINTS_OF_INTEREST[next_bed_view[0]][next_bed_view[1]][:3])
+                )
+                yaw_diff_next = np.abs(
+                    odom_data[YAW_IDX]
+                    - POINTS_OF_INTEREST[next_bed_view[0]][next_bed_view[1]][YAW_IDX]
+                )
+                if distance_next < distance:
+                    self.current_bed_view_idx += 1
+                    bed_view = next_bed_view
+                    distance = distance_next
+                    yaw_diff = yaw_diff_next
+                elif distance_next == distance:
+                    if yaw_diff_next < yaw_diff:
+                        self.current_bed_view_idx += 1
+                        bed_view = next_bed_view
+                        distance = distance_next
+                        yaw_diff = yaw_diff_next
 
             # Write images only if the UAV is close to a point of interest
             if (
                 distance < PROXIMITY_THRESHOLD
-                and (
-                    roll_diff < ROLL_THRESHOLD or roll_diff > 2 * np.pi - ROLL_THRESHOLD
-                )
-                and (yaw_diff < YAW_THRESHOLD or yaw_diff > 2 * np.pi - YAW_THRESHOLD)
+                and odom_data[ROLL_IDX] < ROLL_THRESHOLD
+                and yaw_diff < YAW_THRESHOLD
             ):
                 img_color = bridge.imgmsg_to_cv2(self.current_color_msg, "bgr8")
                 img_depth = bridge.imgmsg_to_cv2(self.current_depth_msg, "8UC1")
 
-                bed_id = self.current_bed_view[0]
-                bed_side = self.current_bed_view[1]
+                bed_id = bed_view[0]
+                bed_side = bed_view[1]
                 img_idx = self.bed_images[(bed_id, bed_side)]
 
                 unique_id = f"{bed_id}{bed_side}_{img_idx}_eval"
@@ -161,13 +192,14 @@ class PhotoLogger:
                     out_file.write(odom_txt)
 
                 self.bed_images[(bed_id, bed_side)] += 1
+                enaugh_data = self.bed_images[(bed_id, bed_side)] >= self.max_images
+                if enaugh_data:
+                    self.current_bed_view_idx += 1
 
                 img_data_msg = BedImageData()
                 img_data_msg.bed_id = bed_id
                 img_data_msg.bed_side = bed_side
-                img_data_msg.enaugh_data = (
-                    self.bed_images[(bed_id, bed_side)] >= self.max_images
-                )
+                img_data_msg.enaugh_data = enaugh_data
                 img_data_msg.img_color = self.current_color_msg
                 img_data_msg.img_depth = self.current_depth_msg
                 self.pub_bed_image_data.publish(img_data_msg)
@@ -177,6 +209,7 @@ class PhotoLogger:
                     f"{self.bed_images[(bed_id, bed_side)]}/{self.max_images}"
                 )
             self.rate.sleep()
+        rospy.loginfo("[Photo Logger] Finished.")
 
 
 if __name__ == "__main__":
