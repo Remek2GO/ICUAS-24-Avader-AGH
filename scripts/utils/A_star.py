@@ -92,7 +92,7 @@ class A_star:
                 for setpoint in self.open_list:
 
                     h_cost = self.MST(setpoint)
-                    
+
                     f_cost.update(
                         {
                             setpoint: g_cost
@@ -273,7 +273,14 @@ class A_star:
             current_point, end_point, self.num_chebyshev_back_to_start
         )
         new_path += new_points
+
         new_path.append(end_point)
+
+        # if DEBUG_MODE:
+        print("Punkty z pośrednimi: ")
+        for item in new_path:
+            print(item)
+
 
         return new_path
 
