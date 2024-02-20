@@ -42,7 +42,11 @@ windows:
   - avader_controller:
       layout: tiled
       panes:
-        - waitForRos; roslaunch icuas24_competition challenge.launch
+        - |
+          waitForRos
+          rm /root/sim_ws/src/icuas24_competition/images_eval/*.png
+          rm /root/sim_ws/src/icuas24_competition/images_eval/*.txt
+          roslaunch icuas24_competition challenge.launch
   - evaluation:
       layout: tiled
       panes:

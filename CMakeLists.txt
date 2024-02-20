@@ -52,6 +52,8 @@ catkin_python_setup()
 add_message_files(
   FILES
   AnalyzerResult.msg
+  BedImageData.msg
+  DestinationBedView.msg
   ImageForAnalysis.msg
   UavSetpoint.msg
 )
@@ -169,6 +171,7 @@ catkin_install_python(PROGRAMS
   scripts/evaluator.py
   scripts/image_analyzer.py
   scripts/path_setter.py
+  scripts/path_setter_dev.py
   scripts/photo_taker.py
   scripts/photo_logger.py
   
