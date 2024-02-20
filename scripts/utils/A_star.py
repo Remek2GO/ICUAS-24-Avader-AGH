@@ -338,4 +338,4 @@ def start(AREAS_FROM_DRONE):
 
     final_path = Astar_fly.search_path(LOCALIZATION)
 
-    return final_path
+    return final_path, Astar_fly.path
