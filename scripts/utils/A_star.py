@@ -21,9 +21,9 @@ class A_star:
         self.close_list = []
         self.path = []
 
-        self.num_chebyshev_between_beds = 10
-        self.num_chebyshev_back_to_start = 5
-        self.num_chebyshev_along_beds_to_start = 5
+        self.num_chebyshev_between_beds = 15
+        self.num_chebyshev_back_to_start = 10
+        self.num_chebyshev_along_beds_to_start = 10
         self.num_chebyshev_change_beds = 3
 
     def add_setpoint(self, number, setpoint: Setpoint):
@@ -141,12 +141,37 @@ class A_star:
         if DEBUG_MODE:
             print("Punkty bez pośrednich :", points_to_visit)
 
-        # new_path.append([points_to_visit[0][0], 2, points_to_visit[0][2], 0, 0, 0])
+        # Przejscie na wysokosc pierwszego regalu - przemieszczenie w osi X
+
+        start_point = [
+            self.start_location.x,
+            self.start_location.y,
+            self.start_location.z,
+            self.start_location.roll,
+            self.start_location.pitch,
+            self.start_location.yaw,
+        ]
+        current_point = [
+            points_to_visit[0][0],
+            2,
+            points_to_visit[0][2],
+            0,
+            0,
+            points_to_visit[0][5],
+        ]
+        new_points = generate_intermediate_points(
+            start_point, current_point, self.num_chebyshev_between_beds
+        )
+        new_path += new_points
+        new_path.append(current_point)
+            
+        points_to_visit.insert(0,current_point)
+
         for i, point in enumerate(points_to_visit):
             if not previous_point:
                 current_point = copy.deepcopy(point)
                 previous_point = current_point
-                new_path.append(current_point)
+                # new_path.append(current_point)
             else:
                 if (
                     point[0] == previous_point[0]
@@ -221,6 +246,8 @@ class A_star:
                     # Aktualizacja poprzedniego punktu
                     previous_point = current_point
 
+
+
         # Powrot do punktu startowego - przemieszczenie w osi Y poza regal
         current_point = copy.copy(point)
         current_point[1] = 2
@@ -248,6 +275,13 @@ class A_star:
         new_path += new_points
 
         new_path.append(end_point)
+
+        # if DEBUG_MODE:
+        print("Punkty z pośrednimi: ")
+        for item in new_path:
+            print(item)
+
+
         return new_path
 
     def prepare_points(self, points_from_drone):
@@ -265,7 +299,7 @@ def chebyshev_nodes(n, a, b):
     # od -1 do 1
 
     # przeksztalcenie afiniczne do zadanego przedzialu (a, b)
-    xk_norm = np.zeros((n, 3))
+    xk_norm = np.zeros((n, len(a)))
     for i in range(n):
         xk_norm[i] = xk[i] * (b - a) / 2 + (a + b) / 2
 
@@ -273,14 +307,14 @@ def chebyshev_nodes(n, a, b):
 
 
 def generate_intermediate_points(previous_point, point, n):
-    a = np.array(previous_point[:3])
-    b = np.array(point[:3])
+    a = np.array(previous_point)
+    b = np.array(point)
     xk_norm = chebyshev_nodes(n, a, b)
 
     new_points = []
     for i in range(len(xk_norm)):
         interpoint = copy.deepcopy(previous_point)
-        interpoint[:3] = xk_norm[i]
+        interpoint = xk_norm[i]
         new_points.append(interpoint)
 
     return new_points
@@ -291,7 +325,7 @@ def start(AREAS_FROM_DRONE):
     LOCALIZATION = positions.POINTS_OF_INTEREST
     HEURISTIC = positions.matrix_of_distances()
     Astar_fly = A_star(
-        start_location=Setpoint(*LOCALIZATION[0][0]),
+        start_location=Setpoint(1.5, 1.5, 1, 0, 0, 0),
         end_location=Setpoint(0, 0, 1, 0, 0, 0),
         heuristic=HEURISTIC,
     )
