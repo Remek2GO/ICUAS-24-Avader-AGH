@@ -169,8 +169,9 @@ class A_star:
 
         if DEBUG_MODE:
             print("Punkty bez pośrednich :", points_to_visit)
-        new_path.append([points_to_visit[0][0], 2, points_to_visit[0][2], 0, 0, 0])
-        for point in points_to_visit:
+
+        # new_path.append([points_to_visit[0][0], 2, points_to_visit[0][2], 0, 0, 0])
+        for i, point in enumerate(points_to_visit):
             if not previous_point:
                 point_copy = copy.copy(point)
                 previous_point = point_copy
@@ -178,26 +179,93 @@ class A_star:
             else:
                 if point[0] == previous_point[0]:
                     point_copy = copy.deepcopy(point)
+
+                    # chebyshev nodes - interpolacja
+                    n = 10
+                    a = copy.deepcopy(np.array(previous_point[:3]))
+                    b = copy.deepcopy(np.array(point_copy[:3]))
+                    xk_norm = chebyshev_nodes(n, a, b)
+
+                    for i in range(len(xk_norm)):
+                        interpoint = copy.deepcopy(previous_point)
+                        interpoint[:3] = xk_norm[i]
+                        new_path.append(interpoint)
+
                     new_path.append(point_copy)
                     previous_point = point_copy
                 else:
                     previous_point_copy = copy.deepcopy(previous_point)
                     point_copy = copy.deepcopy(point)
-                    previous_point_copy[5] = np.pi / 2
+
+                    if i + 1 < len(points_to_visit):
+                        # previous_point_copy[5] =  np.pi / 2
+                        previous_point_copy[5] =  points_to_visit[i+1][5] # obrot taki jak nastepny punkt
+                    else:
+                        previous_point_copy[5] = 0 # pozycja poczatkowa
+
+
                     if abs(previous_point[1] - 25) > abs(previous_point[1] - 2):
                         previous_point_copy[1] = 2
                     else:
                         previous_point_copy[1] = 25
+
+                    # chebyshev nodes - interpolacja
+                    n = 5
+                    a = copy.deepcopy(np.array(previous_point[:3]))
+                    b = copy.deepcopy(np.array(previous_point_copy[:3]))
+                    xk_norm = chebyshev_nodes(n, a, b)
+
+                    
+                    for i in range(len(xk_norm)):
+                        interpoint = copy.deepcopy(previous_point_copy)
+                        interpoint[:3] = xk_norm[i]
+                        new_path.append(interpoint)
+
                     new_path.append(previous_point_copy)
                     previous_point_copy_copy = copy.copy(previous_point_copy)
                     previous_point_copy_copy[2] = copy.copy(point_copy[2])
                     previous_point_copy_copy[0] = copy.copy(point_copy[0])
+
+                    # chebyshev nodes - interpolacja
+                    a = copy.deepcopy(np.array(previous_point_copy[:3]))
+                    b = copy.deepcopy(np.array(previous_point_copy_copy[:3]))
+                    xk_norm = chebyshev_nodes(n, a, b)
+
+                    for i in range(len(xk_norm)):
+                        interpoint = copy.deepcopy(previous_point_copy)
+                        interpoint[:3] = xk_norm[i]
+                        new_path.append(interpoint)
+
+
                     new_path.append(previous_point_copy_copy)
+
+                    # chebyshev nodes - interpolacja
+                    a = copy.deepcopy(np.array(previous_point_copy_copy[:3]))
+                    b = copy.deepcopy(np.array(point_copy[:3]))
+                    xk_norm = chebyshev_nodes(n, a, b)
+
+                    for i in range(len(xk_norm)):
+                        interpoint = copy.deepcopy(previous_point_copy_copy)
+                        interpoint[:3] = xk_norm[i]
+                        new_path.append(interpoint)
+
+
                     new_path.append(point_copy)
                     previous_point = point_copy
 
         point_copy = copy.copy(point)
         point_copy[1] = 2
+
+        # chebyshev nodes - interpolacja
+        a = copy.deepcopy(np.array(previous_point[:3]))
+        b = copy.deepcopy(np.array(point_copy[:3]))
+        xk_norm = chebyshev_nodes(4, a, b)
+
+        for i in range(len(xk_norm)):
+            interpoint = copy.deepcopy(previous_point)
+            interpoint[:3] = xk_norm[i]
+            new_path.append(interpoint)
+
         new_path.append(point_copy)
         new_path.append([0, 0, 1, 0, 0, 0])
         return new_path
@@ -211,6 +279,17 @@ class A_star:
             example_of_points.append(x * 2 + 1)
         return example_of_points
 
+
+def chebyshev_nodes(n, a, b):
+    xk = [np.cos((2*k - 1)*np.pi/(2*n)) for k in range(1, n+1)][::-1] # od -1 do 1
+
+    # przeksztalcenie afiniczne do zadanego przedzialu (a, b)
+    xk_norm = np.zeros((n, 3))
+    for i in range(n):
+        xk_norm[i] = xk[i] * (b - a) / 2 + (a + b)/2
+
+    return xk_norm
+    
 
 def start(AREAS_FROM_DRONE):
 
