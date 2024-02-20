@@ -63,7 +63,8 @@ class PhotoAnalyzer:
                     img_color, img_depth, odom_data
                 )
                 for patch, patch_coords in zip(patches, patches_coords):
-                    fruit_count, fruit_type, fruit_centre = process_patch(patch)
+                    fruit_count, fruit_type, fruit_centres = process_patch(patch)
+                    # Mark plants
                     cv2.rectangle(
                         img_rotated,
                         (patch_coords[2], patch_coords[0]),
@@ -71,6 +72,24 @@ class PhotoAnalyzer:
                         (255, 0, 0),
                         2,
                     )
+                    # Mark fruits
+                    for centre in fruit_centres:
+                        cv2.circle(
+                            img_rotated,
+                            (
+                                int(
+                                    centre[1] * (patch_coords[3] - patch_coords[2])
+                                    + patch_coords[2]
+                                ),
+                                int(
+                                    centre[0] * (patch_coords[1] - patch_coords[0])
+                                    + patch_coords[0]
+                                ),
+                            ),
+                            5,
+                            (0, 255, 0),
+                            -1,
+                        )
                 self.result_image = bridge.cv2_to_imgmsg(img_rotated, "bgr8")
 
             # Publish the result image

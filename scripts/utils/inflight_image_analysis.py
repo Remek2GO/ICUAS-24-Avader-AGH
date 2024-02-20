@@ -102,7 +102,7 @@ def get_patches(
     # cv2.imshow("IR", img_color_rotated)
     # cv2.imshow("DR", img_depth_rotated * 10)
 
-    # Depth image segmentation - looking for plants (squares)
+    # Image segmentation - looking for plants (squares)
     hsv = cv2.cvtColor(img_color_rotated, cv2.COLOR_BGR2HSV)
     plants_mask = mask_plants(hsv)
 
