@@ -23,11 +23,11 @@ from scripts.utils.positions import POINTS_OF_INTEREST
 bridge = CvBridge()
 
 IMAGES_FOLDER_PATH = "/root/sim_ws/src/icuas24_competition/images_eval"
-PROXIMITY_THRESHOLD = 0.1  # 0.1
+PROXIMITY_THRESHOLD = 0.2  # 0.1
 ROLL_IDX = 3
-ROLL_THRESHOLD = np.pi / 45
+ROLL_THRESHOLD = 6 * np.pi / 180
 YAW_IDX = 5
-YAW_THRESHOLD = np.pi / 45
+YAW_THRESHOLD = 3 * np.pi / 180
 
 
 class PhotoLogger:
@@ -75,7 +75,20 @@ class PhotoLogger:
             (bed_view.bed_id, bed_view.bed_side): 0 for bed_view in msg.bed_views
         }
         self.current_bed_view_idx = 0
-        rospy.loginfo(f"[Photo Logger] Bed views received: {self.bed_view_order}")
+        rospy.logdebug(f"[Photo Logger] Bed views received: {self.bed_view_order}")
+
+    def _get_yaw_error(self, yaw1: float, yaw2: float) -> float:
+        """Calculate the yaw error between two angles in radians.
+
+        Args:
+            yaw1 (float): The first angle [radians].
+            yaw2 (float): The second angle [radians].
+
+        Returns:
+            float: The yaw error between the two angles in radians.
+        """
+        yaw_diff = np.abs(yaw1 - yaw2)
+        return min(yaw_diff, 2 * np.pi - yaw_diff)
 
     def _image_color_clb(self, msg: Image):
         self.current_color_msg = msg
@@ -110,9 +123,8 @@ class PhotoLogger:
 
         # Main loop
         rospy.loginfo("[Photo Logger] Entering main loop.")
-        while (
-            not rospy.is_shutdown() 
-            and self.current_bed_view_idx < len(self.bed_view_order)
+        while not rospy.is_shutdown() and self.current_bed_view_idx < len(
+            self.bed_view_order
         ):
             # Get distances from odom_position to all points of interest
             odom_data = np.array(
@@ -137,19 +149,21 @@ class PhotoLogger:
                 odom_data[:3]
                 - np.array(POINTS_OF_INTEREST[bed_view[0]][bed_view[1]][:3])
             )
-            yaw_diff = np.abs(
-                odom_data[YAW_IDX]
-                - POINTS_OF_INTEREST[bed_view[0]][bed_view[1]][YAW_IDX]
+            yaw_diff = self._get_yaw_error(
+                odom_data[YAW_IDX],
+                POINTS_OF_INTEREST[bed_view[0]][bed_view[1]][YAW_IDX],
             )
             if self.current_bed_view_idx < len(self.bed_view_order) - 1:
                 next_bed_view = self.bed_view_order[self.current_bed_view_idx + 1]
                 distance_next = np.linalg.norm(
                     odom_data[:3]
-                    - np.array(POINTS_OF_INTEREST[next_bed_view[0]][next_bed_view[1]][:3])
+                    - np.array(
+                        POINTS_OF_INTEREST[next_bed_view[0]][next_bed_view[1]][:3]
+                    )
                 )
-                yaw_diff_next = np.abs(
-                    odom_data[YAW_IDX]
-                    - POINTS_OF_INTEREST[next_bed_view[0]][next_bed_view[1]][YAW_IDX]
+                yaw_diff_next = self._get_yaw_error(
+                    odom_data[YAW_IDX],
+                    POINTS_OF_INTEREST[next_bed_view[0]][next_bed_view[1]][YAW_IDX],
                 )
                 if distance_next < distance:
                     self.current_bed_view_idx += 1
@@ -163,6 +177,11 @@ class PhotoLogger:
                         distance = distance_next
                         yaw_diff = yaw_diff_next
 
+            rospy.logdebug(
+                f"[Photo Logger] Searching ({bed_view[0]}, {bed_view[1]}): "
+                f"Distance: {distance}, Yaw diff: {yaw_diff}, "
+                f"Roll: {odom_data[ROLL_IDX]}"
+            )
             # Write images only if the UAV is close to a point of interest
             if (
                 distance < PROXIMITY_THRESHOLD
