@@ -12,14 +12,19 @@ DEBUG_MODE = False
 
 
 class A_star:
-    def __init__(self, start_location, heuristic) -> None:
+    def __init__(self, start_location, end_location, heuristic) -> None:
         self.setpoints = {}
         self.start_location = start_location
-        self.end_location = start_location
+        self.end_location = end_location
         self.heuristic_distances = heuristic
         self.open_list = []
         self.close_list = []
         self.path = []
+
+        self.num_chebyshev_between_beds = 10
+        self.num_chebyshev_back_to_start = 5
+        self.num_chebyshev_along_beds_to_start = 5
+        self.num_chebyshev_change_beds = 3
 
     def add_setpoint(self, number, setpoint: Setpoint):
         self.setpoints.update({number: setpoint})
@@ -62,7 +67,6 @@ class A_star:
 
         # Dodanie dystansu od ostatniego punktu do punktu poczatkowego/docelowego
         sum_weights += self.heuristic_distances[b][0]
-    
 
         return sum_weights
 
@@ -74,7 +78,7 @@ class A_star:
         for setpoint in self.setpoints.keys():
             self.open_list.append(setpoint)
         # print("Open list: ", self.open_list)
-        
+
         self.open_list.remove(current_node)
         self.open_list.remove(current_node + 1)
 
@@ -86,41 +90,8 @@ class A_star:
             if len(self.open_list) != 1:
                 # print("Open list: ", self.open_list)
                 for setpoint in self.open_list:
-                    h_cost = self.MST(setpoint) # ??
-                    # print("Setpoint: ", setpoint / 2)
-                    # print("MST: ", h_cost)
-                    open_list_copy = copy.copy(self.open_list)
-                    open_list_copy.remove(setpoint)
-                    min_cost = np.inf
-                    for point in open_list_copy: # not used
-                        if self.heuristic_distances[point][0] < min_cost:
-                            min_cost = self.heuristic_distances[point][0]
 
-                    # print("Min cost: ", min_cost)
-                    # print("idx01 ", np.floor(setpoint / 2))
-                    # print("idx02 ", np.floor(current_node / 2))
-                    # print("idx11 ", setpoint % 2)
-                    # print("idx12 ", current_node % 2)
-
-                    # current_node % 2 == 0 -- lewa strona
-                    # current_node % 2 == 1 -- prawa strona
-                    # if (
-                    #     LOCALIZATION[np.floor(setpoint / 2)][setpoint % 2][2]
-                    #     == LOCALIZATION[np.floor(current_node / 2)][current_node % 2][2]                                                                                            
-                    # ): # to sama wysoksoc - wspolrzedna Z
-                    #     h_cost = h_cost - 3
-                    #     print("Minus 3")
-                    # if (
-                    #     LOCALIZATION[np.floor(setpoint / 2)][setpoint % 2][5]
-                    #     == LOCALIZATION[np.floor(current_node / 2)][current_node % 2][5]
-                    # ): # to samo obrocenie - wspolrzedna Yaw
-                    #     h_cost = h_cost - 0.1
-                    #     print("Minus 0.1")
-                    # if (
-                    #     LOCALIZATION[np.floor(setpoint / 2)][setpoint % 2][0] != LOCALIZATION[np.floor(current_node / 2)][current_node % 2][0]
-                    # ): # to inna pozycja X
-                    #     h_cost = h_cost + 1
-                    #     print("Plus 1")
+                    h_cost = self.MST(setpoint)
 
                     f_cost.update(
                         {
@@ -173,101 +144,110 @@ class A_star:
         # new_path.append([points_to_visit[0][0], 2, points_to_visit[0][2], 0, 0, 0])
         for i, point in enumerate(points_to_visit):
             if not previous_point:
-                point_copy = copy.copy(point)
-                previous_point = point_copy
-                new_path.append(point_copy)
+                current_point = copy.deepcopy(point)
+                previous_point = current_point
+                new_path.append(current_point)
             else:
-                if point[0] == previous_point[0]:
-                    point_copy = copy.deepcopy(point)
+                if (
+                    point[0] == previous_point[0]
+                ):  # jezeli punkty maja taka sama wspolrzedna x
+                    current_point = copy.deepcopy(point)
 
                     # chebyshev nodes - interpolacja
-                    n = 10
-                    a = copy.deepcopy(np.array(previous_point[:3]))
-                    b = copy.deepcopy(np.array(point_copy[:3]))
-                    xk_norm = chebyshev_nodes(n, a, b)
+                    new_points = generate_intermediate_points(
+                        previous_point, current_point, self.num_chebyshev_between_beds
+                    )
+                    new_path += new_points
 
-                    for i in range(len(xk_norm)):
-                        interpoint = copy.deepcopy(previous_point)
-                        interpoint[:3] = xk_norm[i]
-                        new_path.append(interpoint)
+                    new_path.append(current_point)
+                    previous_point = current_point
 
-                    new_path.append(point_copy)
-                    previous_point = point_copy
-                else:
-                    previous_point_copy = copy.deepcopy(previous_point)
-                    point_copy = copy.deepcopy(point)
+                else:  # jezeli punkty maja rozne wspolrzedne x - zmiana regalu
+
+                    ## 1. wyznaczenie punktow poza regal dla x rownego odwiedzonego punktu
+                    edge_previous_point = copy.copy(previous_point)
+                    current_point = copy.deepcopy(point)
 
                     if i + 1 < len(points_to_visit):
-                        # previous_point_copy[5] =  np.pi / 2
-                        previous_point_copy[5] =  points_to_visit[i+1][5] # obrot taki jak nastepny punkt
+                        # new_previous_point[5] =  np.pi / 2
+                        edge_previous_point[5] = points_to_visit[i + 1][
+                            5
+                        ]  # obrot taki jak nastepny punkt
                     else:
-                        previous_point_copy[5] = 0 # pozycja poczatkowa
-
+                        edge_previous_point[5] = 0  # poczatkowa wartosc obrotu yaw
 
                     if abs(previous_point[1] - 25) > abs(previous_point[1] - 2):
-                        previous_point_copy[1] = 2
+                        edge_previous_point[1] = 2
                     else:
-                        previous_point_copy[1] = 25
+                        edge_previous_point[1] = 25
 
                     # chebyshev nodes - interpolacja
-                    n = 5
-                    a = copy.deepcopy(np.array(previous_point[:3]))
-                    b = copy.deepcopy(np.array(previous_point_copy[:3]))
-                    xk_norm = chebyshev_nodes(n, a, b)
+                    new_points = generate_intermediate_points(
+                        previous_point,
+                        edge_previous_point,
+                        self.num_chebyshev_change_beds,
+                    )
+                    new_path += new_points
 
-                    
-                    for i in range(len(xk_norm)):
-                        interpoint = copy.deepcopy(previous_point_copy)
-                        interpoint[:3] = xk_norm[i]
-                        new_path.append(interpoint)
+                    new_path.append(edge_previous_point)
 
-                    new_path.append(previous_point_copy)
-                    previous_point_copy_copy = copy.copy(previous_point_copy)
-                    previous_point_copy_copy[2] = copy.copy(point_copy[2])
-                    previous_point_copy_copy[0] = copy.copy(point_copy[0])
+                    ## 2. wyznaczenie punktow wzdluz krotszego boku regalu
+                    edge_current_point = copy.copy(edge_previous_point)
+                    edge_current_point[2] = copy.copy(current_point[2])
+                    edge_current_point[0] = copy.copy(current_point[0])
 
                     # chebyshev nodes - interpolacja
-                    a = copy.deepcopy(np.array(previous_point_copy[:3]))
-                    b = copy.deepcopy(np.array(previous_point_copy_copy[:3]))
-                    xk_norm = chebyshev_nodes(n, a, b)
+                    new_points = generate_intermediate_points(
+                        edge_previous_point,
+                        edge_current_point,
+                        self.num_chebyshev_change_beds,
+                    )
+                    new_path += new_points
 
-                    for i in range(len(xk_norm)):
-                        interpoint = copy.deepcopy(previous_point_copy)
-                        interpoint[:3] = xk_norm[i]
-                        new_path.append(interpoint)
+                    new_path.append(edge_current_point)
 
-
-                    new_path.append(previous_point_copy_copy)
+                    ## 3. wyznaczenie punktow poza regal dla x rownego docelowej pozycji
 
                     # chebyshev nodes - interpolacja
-                    a = copy.deepcopy(np.array(previous_point_copy_copy[:3]))
-                    b = copy.deepcopy(np.array(point_copy[:3]))
-                    xk_norm = chebyshev_nodes(n, a, b)
+                    new_points = generate_intermediate_points(
+                        edge_current_point,
+                        current_point,
+                        self.num_chebyshev_change_beds,
+                    )
+                    new_path += new_points
 
-                    for i in range(len(xk_norm)):
-                        interpoint = copy.deepcopy(previous_point_copy_copy)
-                        interpoint[:3] = xk_norm[i]
-                        new_path.append(interpoint)
+                    new_path.append(current_point)
 
+                    # Aktualizacja poprzedniego punktu
+                    previous_point = current_point
 
-                    new_path.append(point_copy)
-                    previous_point = point_copy
-
-        point_copy = copy.copy(point)
-        point_copy[1] = 2
+        # Powrot do punktu startowego - przemieszczenie w osi Y poza regal
+        current_point = copy.copy(point)
+        current_point[1] = 2
 
         # chebyshev nodes - interpolacja
-        a = copy.deepcopy(np.array(previous_point[:3]))
-        b = copy.deepcopy(np.array(point_copy[:3]))
-        xk_norm = chebyshev_nodes(4, a, b)
+        new_points = generate_intermediate_points(
+            point, current_point, self.num_chebyshev_along_beds_to_start
+        )
+        new_path += new_points
 
-        for i in range(len(xk_norm)):
-            interpoint = copy.deepcopy(previous_point)
-            interpoint[:3] = xk_norm[i]
-            new_path.append(interpoint)
+        new_path.append(current_point)
 
-        new_path.append(point_copy)
-        new_path.append([0, 0, 1, 0, 0, 0])
+        # Powrot do punktu startowego - przemieszczenie w osi X do punktu startowego
+        end_point = [
+            self.end_location.x,
+            self.end_location.y,
+            self.end_location.z,
+            self.end_location.roll,
+            self.end_location.pitch,
+            self.end_location.yaw,
+        ]
+        new_points = generate_intermediate_points(
+            current_point, end_point, self.num_chebyshev_back_to_start
+        )
+        new_path += new_points
+
+        new_path.append(end_point)
         return new_path
 
     def prepare_points(self, points_from_drone):
@@ -281,22 +261,39 @@ class A_star:
 
 
 def chebyshev_nodes(n, a, b):
-    xk = [np.cos((2*k - 1)*np.pi/(2*n)) for k in range(1, n+1)][::-1] # od -1 do 1
+    xk = [np.cos((2 * k - 1) * np.pi / (2 * n)) for k in range(1, n + 1)][::-1]
+    # od -1 do 1
 
     # przeksztalcenie afiniczne do zadanego przedzialu (a, b)
     xk_norm = np.zeros((n, 3))
     for i in range(n):
-        xk_norm[i] = xk[i] * (b - a) / 2 + (a + b)/2
+        xk_norm[i] = xk[i] * (b - a) / 2 + (a + b) / 2
 
     return xk_norm
-    
+
+
+def generate_intermediate_points(previous_point, point, n):
+    a = np.array(previous_point[:3])
+    b = np.array(point[:3])
+    xk_norm = chebyshev_nodes(n, a, b)
+
+    new_points = []
+    for i in range(len(xk_norm)):
+        interpoint = copy.deepcopy(previous_point)
+        interpoint[:3] = xk_norm[i]
+        new_points.append(interpoint)
+
+    return new_points
+
 
 def start(AREAS_FROM_DRONE):
 
     LOCALIZATION = positions.POINTS_OF_INTEREST
     HEURISTIC = positions.matrix_of_distances()
     Astar_fly = A_star(
-        start_location=Setpoint(*LOCALIZATION[0][0]), heuristic=HEURISTIC
+        start_location=Setpoint(*LOCALIZATION[0][0]),
+        end_location=Setpoint(0, 0, 1, 0, 0, 0),
+        heuristic=HEURISTIC,
     )
     POINTS_TO_VISIT = Astar_fly.prepare_points(AREAS_FROM_DRONE)
 
