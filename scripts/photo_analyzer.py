@@ -45,14 +45,28 @@ class PhotoAnalyzer:
             "/avader/output_image", Image, queue_size=10
         )
 
-        self.sub_plants_beds = rospy.Subscriber(
-            "/red/plants_beds", String, self.set_fruit_type
-        )
-
+        rospy.Subscriber("/red/plants_beds", String, self._fruit_type_clb)
         rospy.Subscriber("/avader/bed_image_data", BedImageData, self._image_data_clb)
+
+    def _fruit_type_clb(self, msg: String):
+        fruit_name = msg.data.split(" ")[0]
+        self.fruit_type = PlantType(fruit_name.upper())
 
     def _image_data_clb(self, msg: BedImageData):
         self.bed_image_data_queue.append(msg)
+
+    def get_fruit_count(self) -> int:
+        """Get the total fruit count.
+
+        Returns:
+            int: The total fruit count.
+        """
+        fruit_sum = 0
+        for bed_id in self.plant_beds.keys():
+            no_fruits = self.plant_beds[bed_id].get_bed_fruit_count(self.fruit_type)
+            fruit_sum += no_fruits
+
+        return fruit_sum
 
     def run(self):
         """Run the node."""
@@ -102,6 +116,7 @@ class PhotoAnalyzer:
                             -1,
                         )
 
+                    # Check fruit type
                     plant_type = PlantType.EMPTY
                     if fruit_type == 0:
                         plant_type = PlantType.TOMATO
@@ -110,18 +125,21 @@ class PhotoAnalyzer:
                     elif fruit_type == 2:
                         plant_type = PlantType.PEPPER
 
+                    # Save the obtained data
                     plant_side = PlantSideCount(
                         fruit_count=fruit_count,
                         fruit_position=fruit_centres,
                         fruit_type=plant_type,
                     )
 
-                    if not bed_image_data.bed_id in self.plant_beds:
+                    # Add the plant to the plant bed if it does not exist
+                    if bed_image_data.bed_id not in self.plant_beds:
                         self.plant_beds[bed_image_data.bed_id] = PlantBed()
 
-
+                    # Reverse the index if the bed side is 1
                     idx = i if bed_image_data.bed_side == 0 else len(patches) - i - 1
 
+                    # Gather the data
                     self.plant_beds[bed_image_data.bed_id].set_plant(
                         idx,
                         bed_image_data.bed_side,
@@ -130,7 +148,6 @@ class PhotoAnalyzer:
                         plant_side.fruit_type,
                     )
 
-
                 self.result_image = bridge.cv2_to_imgmsg(img_rotated, "bgr8")
 
             # Publish the result image
@@ -138,20 +155,6 @@ class PhotoAnalyzer:
                 self.pub_output_image.publish(self.result_image)
 
             self.rate.sleep()
-
-
-    def get_fruit_count(self) -> int:
-        sum = 0
-        for bed_id in self.plant_beds.keys():
-            no_fruits = self.plant_beds[bed_id].get_bed_fruit_count(self.fruit_type)
-            sum += no_fruits
-
-        return sum
-
-    def set_fruit_type(self, data: String):
-        type = data.data.split(" ")[0]
-
-        self.fruit_type = PlantType(type.upper())
 
 
 if __name__ == "__main__":
