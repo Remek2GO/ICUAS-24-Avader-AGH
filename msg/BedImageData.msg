@@ -2,6 +2,7 @@
 
 uint8 bed_id                        # 1-27
 uint8 bed_side                      # 0-1 (0: left (closer to origin), 1: right)
+uint8 img_seq                       # Sequence number of the image
 
 bool enaugh_data                    # 0: not enough images for the (bed_id, bed_side), 1: enough images for the (bed_id, bed_side)
 

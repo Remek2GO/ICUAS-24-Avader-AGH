@@ -105,8 +105,9 @@ if __name__ == "__main__":
         print("Usage: photo_analyzer.py <frequency>")
         sys.exit(1)
     frequency = float(myargs[1])
+    log_level = rospy.DEBUG if "--debug" in myargs else rospy.INFO
 
-    rospy.init_node("photo_analyzer", log_level=rospy.DEBUG)
+    rospy.init_node("photo_analyzer", log_level=log_level)
     rospy.loginfo(f"[Photo Analyzer] Node started with params:\n" f"\t{frequency} Hz")
 
     photo_analyzer = PhotoAnalyzer(frequency)
