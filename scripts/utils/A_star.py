@@ -163,8 +163,8 @@ class A_star:
         new_points = generate_intermediate_points(
             start_point, current_point, self.num_chebyshev_between_beds
         )
-        new_path += new_points
-        new_path.append(current_point)
+        #new_path += new_points
+        #new_path.append(current_point)
 
         points_to_visit.insert(0, current_point)
 
@@ -273,13 +273,13 @@ class A_star:
         new_points = generate_intermediate_points(
             current_point, end_point, self.num_chebyshev_back_to_start
         )
-        new_path += new_points
+        #new_path += new_points
 
         previous_end_point = copy.copy(end_point)
         previous_end_point[2] = 2
 
         new_path.append(previous_end_point)
-        new_path.append(end_point)
+        #new_path.append(end_point)
 
         # if DEBUG_MODE:
         # print("Punkty z pośrednimi: ")
@@ -342,7 +342,7 @@ def start(AREAS_FROM_DRONE):
     HEURISTIC = positions.matrix_of_distances()
     Astar_fly = A_star(
         start_location=Setpoint(1, 1, 1, 0, 0, 0),
-        end_location=Setpoint(1, 1, 1, 0, 0, 0),
+        end_location=Setpoint(1, 1, 2, 0, 0, 0),
         heuristic=HEURISTIC,
     )
     POINTS_TO_VISIT = Astar_fly.prepare_points(AREAS_FROM_DRONE)
