@@ -44,10 +44,14 @@ class PhotoAnalyzer:
         self.pub_output_image = rospy.Publisher(
             "/avader/output_image", Image, queue_size=10
         )
+        self.current_fruit_count_pub = rospy.Publisher(
+            "/current_fruit_count", Int32, queue_size=10
+        )
 
         self.sub_plants_beds = rospy.Subscriber(
             "/red/plants_beds", String, self.set_fruit_type
         )
+        
 
         rospy.Subscriber("/avader/bed_image_data", BedImageData, self._image_data_clb)
 
@@ -132,6 +136,9 @@ class PhotoAnalyzer:
 
 
                 self.result_image = bridge.cv2_to_imgmsg(img_rotated, "bgr8")
+                
+                current_fruit_count = self.get_fruit_count()
+                self.current_fruit_count_pub.publish(current_fruit_count)
 
             # Publish the result image
             if self.result_image is not None:
