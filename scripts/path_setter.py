@@ -57,13 +57,13 @@ class PathSetter:
         )
         # ROS subscribers
         rospy.Subscriber(
+            "/avader/current_fruit_count", Int32, self._set_current_fruit_count_clb
+        )
+        rospy.Subscriber(
             "/red/challenge_started", Bool, self._set_challenge_started_clb
         )
         rospy.Subscriber("/red/plants_beds", String, self._set_plants_beds_clb)
         rospy.Subscriber("/red/tracker/status", String, self._set_tracker_status_clb)
-        rospy.Subscriber(
-            "/current_fruit_count", Int32, self._set_current_fruit_count_clb
-        )
         rospy.Subscriber("/move_on", Bool, self._move_on_clb)
 
     def _move_on_clb(self, data: Bool):

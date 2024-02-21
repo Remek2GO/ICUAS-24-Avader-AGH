@@ -7,12 +7,13 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
 import csv
-import cv2
+import numpy as np
 from dataclasses import dataclass
 from typing import Dict, List
 
 import rospy
 from cv_bridge import CvBridge
+from gazebo_msgs.msg import ModelStates
 from std_msgs.msg import Bool, Int32, String
 
 from icuas24_competition.msg import AnalyzerResult
@@ -20,6 +21,7 @@ from scripts.utils.types import PlantBedsIds, PlantType
 
 IMAGES_FOLDER_PATH = "/root/sim_ws/src/icuas24_competition/images"
 BRIDGE = CvBridge()
+END_POSITION = np.array([1.0, 1.0, 1.0])
 
 
 @dataclass
@@ -67,10 +69,15 @@ class Evaluator:
         Args:
             path_to_beds_csv (str): Path to the CSV file containing the plant beds.
         """
+        self.challenge_started_received: bool = False
+        self.plants_beds_received: bool = False
+        self.fruit_count_received: bool = False
         self.start_time: float = None
         self.plant_beds_ids: PlantBedsIds = None
         self.beds_gt: Dict[int, Plant] = {}
         self.fruit_count_gt: int = None
+        self.red_prev_position: np.ndarray = None
+        self.red_distance: float = 0.0
 
         # Load the plant beds from the CSV file to the dictionary
         # NOTE: We add a dummy bed at the beginning to match the bed_id
@@ -106,7 +113,10 @@ class Evaluator:
         rospy.loginfo(f"[Evaluator] Loaded {len(self.plant_beds) - 1} plant beds.")
 
         # ROS subscribers
-        rospy.Subscriber("/analyzer_result", AnalyzerResult, self._analyzer_result_clb)
+        rospy.Subscriber(
+            "/evaluator/analyzer_result", AnalyzerResult, self._analyzer_result_clb
+        )
+        rospy.Subscriber("/gazebo/model_states", ModelStates, self._model_states_clb)
         rospy.Subscriber("/fruit_count", Int32, self._fruit_count_clb)
         rospy.Subscriber("/red/challenge_started", Bool, self._challenge_started_clb)
         rospy.Subscriber("/red/plants_beds", String, self._plants_beds_clb)
@@ -118,56 +128,35 @@ class Evaluator:
 
         # Check if the UAV found the proper number of fruits
         gt = None
-        img_save_path = os.path.join(
-            IMAGES_FOLDER_PATH, f"{msg.bed_id}{msg.bed_side}_out.png"
-        )
-        img_out = BRIDGE.imgmsg_to_cv2(msg.image, "bgr8")
         if msg.bed_side == 0:
             gt = self.beds_gt[msg.bed_id].left_fruits
+            count = msg.fruit_left
         elif msg.bed_side == 1:
             gt = self.beds_gt[msg.bed_id].right_fruits
+            count = msg.fruit_right
         else:
             rospy.logerr(f"[Evaluator] Invalid bed side {msg.bed_side}.")
         if gt is not None:
-            if msg.fruit_count == gt:
+            if count == gt:
                 rospy.loginfo(
                     f"[Evaluator] ({msg.bed_id}, {msg.bed_side}): Correct {gt}."
-                )
-                cv2.putText(
-                    img_out,
-                    f"{self.plant_beds_ids.plant_type} {msg.fruit_count} - CORRECT",
-                    (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    1,
-                    (0, 255, 0),
-                    2,
                 )
             else:
                 rospy.logerr(
                     f"[Evaluator] ({msg.bed_id}, {msg.bed_side}): Incorrect \
-                        {msg.fruit_count} [GT: {gt}]."
+                        {count} [GT: {gt}]."
                 )
-                cv2.putText(
-                    img_out,
-                    f"{self.plant_beds_ids.plant_type} {msg.fruit_count} - ERROR \
-                    [GT: {gt}]",
-                    (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    1,
-                    (0, 0, 255),
-                    2,
-                )
-            cv2.imwrite(img_save_path, img_out)
 
     def _challenge_started_clb(self, msg: Bool):
-        self.start_time = rospy.get_time()
+        if not self.challenge_started_received and msg.data:
+            self.challenge_started_received = True
+            rospy.loginfo("[Evaluator] Received challenge started.")
+        if self.plants_beds_received:
+            self.start_time = rospy.get_time()
+            rospy.loginfo("[Evaluator] Time start.")
 
     def _fruit_count_clb(self, msg: Int32):
-        # Log the time it took to find all the fruits
-        exec_time = rospy.get_time() - self.start_time
-        if self.start_time is not None:
-            rospy.loginfo(f"[Evaluator] Time to find all fruits: {exec_time} s.")
-            self.start_time = None
+        self.fruit_count_received = True
 
         # Check if the UAV found the proper number of fruits
         if msg.data == self.fruit_count_gt:
@@ -178,7 +167,48 @@ class Evaluator:
                 [GT: {self.fruit_count_gt}]."
             )
 
+    def _model_states_clb(self, msg: ModelStates):
+        # Get the pose of the UAV
+        try:
+            red_idx = msg.name.index("red")
+        except ValueError:
+            return
+        red_pose = msg.pose[red_idx]
+        red_position = np.array(
+            [red_pose.position.x, red_pose.position.y, red_pose.position.z]
+        )
+
+        # Accumulate the distance travelled by the UAV
+        if self.red_prev_position is not None:
+            self.red_distance += np.linalg.norm(red_position - self.red_prev_position)
+        else:
+            self.red_distance = 0.0
+
+        # Check if the UAV reached the end position
+        if (
+            np.linalg.norm(red_position - END_POSITION) < 0.1
+            and np.linalg.norm(self.red_prev_position - END_POSITION) < 0.1
+            and self.fruit_count_received
+        ):
+            rospy.loginfo(
+                f"[Evaluator] End position reached. Distance: {self.red_distance:.2f}."
+            )
+            if self.start_time is not None:
+                rospy.loginfo(
+                    f"[Evaluator] Time taken: {rospy.get_time() - self.start_time:.2f}."
+                )
+            else:
+                rospy.logwarn("[Evaluator] Time start not received.")
+            rospy.signal_shutdown("End position reached.")
+        self.red_prev_position = red_position
+
     def _plants_beds_clb(self, msg: String):
+        self.plants_beds_received = True
+        rospy.loginfo("[Evaluator] Received plant beds.")
+        if self.challenge_started_received:
+            self.start_time = rospy.get_time()
+            rospy.loginfo("[Evaluator] Time start.")
+
         beds_data = msg.data.split(" ")
         self.plant_beds_ids = PlantBedsIds(
             PlantType(beds_data[0].upper()),

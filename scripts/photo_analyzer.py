@@ -4,7 +4,7 @@
 import cv2
 import os
 import sys
-from typing import List
+from typing import List, Dict
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
@@ -13,10 +13,9 @@ import rospy
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from std_msgs.msg import Int32, String
-from typing import List, Dict
 
-from icuas24_competition.msg import BedImageData
-from scripts.utils.detect_fruits import process_patch, FRUIT_TYPE_ENCODING
+from icuas24_competition.msg import AnalyzerResult, BedImageData
+from scripts.utils.detect_fruits import process_patch
 from scripts.utils.inflight_image_analysis import get_patches
 from scripts.utils.plant_bed import PlantBed, PlantSideCount
 from scripts.utils.types import PlantType
@@ -27,7 +26,7 @@ bridge = CvBridge()
 class PhotoAnalyzer:
     """Class to analyze the photos of the plants."""
 
-    def __init__(self, frequency: float):
+    def __init__(self, frequency: float, eval_mode: bool = False):
         """Initialize the PhotoAnalyzer class.
 
         Args:
@@ -40,13 +39,20 @@ class PhotoAnalyzer:
         self.plant_beds: Dict[int, PlantBed] = {}
         self.fruit_type: PlantType = None
 
+        self.eval_mode = eval_mode
+
         # ROS publishers and subscribers
+        self.pub_current_fruit_count = rospy.Publisher(
+            "/avader/current_fruit_count", Int32, queue_size=10
+        )
         self.pub_output_image = rospy.Publisher(
             "/avader/output_image", Image, queue_size=10
         )
-        self.current_fruit_count_pub = rospy.Publisher(
-            "/current_fruit_count", Int32, queue_size=10
-        )
+
+        if self.eval_mode:
+            self.pub_analyzer_result = rospy.Publisher(
+                "/evaluator/analyzer_result", AnalyzerResult, queue_size=10
+            )
 
         rospy.Subscriber("/red/plants_beds", String, self._fruit_type_clb)
         rospy.Subscriber("/avader/bed_image_data", BedImageData, self._image_data_clb)
@@ -151,10 +157,30 @@ class PhotoAnalyzer:
                         plant_side.fruit_type,
                     )
 
+                # Publish image with detection results
                 self.result_image = bridge.cv2_to_imgmsg(img_rotated, "bgr8")
-                
+
+                # Publish the current fruit count
                 current_fruit_count = self.get_fruit_count()
-                self.current_fruit_count_pub.publish(current_fruit_count)
+                self.pub_current_fruit_count.publish(current_fruit_count)
+
+                # Only for evaluation
+                if self.eval_mode:
+                    # Publish the result
+                    analyzer_result = AnalyzerResult(
+                        bed_id=bed_image_data.bed_id,
+                        bed_side=bed_image_data.bed_side,
+                        fruit_sum=self.plant_beds[
+                            bed_image_data.bed_id
+                        ].get_bed_fruit_count(self.fruit_type),
+                        fruit_right=self.plant_beds[
+                            bed_image_data.bed_id
+                        ].get_bed_fruit_count_right(self.fruit_type),
+                        fruit_left=self.plant_beds[
+                            bed_image_data.bed_id
+                        ].get_bed_fruit_count_left(self.fruit_type),
+                    )
+                    self.pub_analyzer_result.publish(analyzer_result)
 
             # Publish the result image
             if self.result_image is not None:
@@ -170,9 +196,10 @@ if __name__ == "__main__":
         sys.exit(1)
     frequency = float(myargs[1])
     log_level = rospy.DEBUG if "--debug" in myargs else rospy.INFO
+    eval_mode = "--eval" in myargs
 
     rospy.init_node("photo_analyzer", log_level=log_level)
     rospy.loginfo(f"[Photo Analyzer] Node started with params:\n" f"\t{frequency} Hz")
 
-    photo_analyzer = PhotoAnalyzer(frequency)
+    photo_analyzer = PhotoAnalyzer(frequency, eval_mode)
     photo_analyzer.run()
