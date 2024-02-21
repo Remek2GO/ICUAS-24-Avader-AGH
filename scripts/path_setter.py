@@ -293,6 +293,7 @@ if __name__ == "__main__":
 
     path_setter = PathSetter(frequency)
     path_setter.wait_for_challenge_start()
+    challenge_start_time = rospy.get_time()
 
     if arg_manual:
         # Manual setpoints
@@ -320,6 +321,10 @@ if __name__ == "__main__":
     else:
         # Send the entire trajectory
         path_setter.send_photo_poses(photo_poses)
+        rospy.loginfo(
+            f"[Path Setter] Sending trajectory, "
+            f"delta = {rospy.get_time() - challenge_start_time}"
+        )
         path_setter.run_continuous()
 
     rospy.spin()

@@ -164,8 +164,8 @@ class A_star:
         )
         new_path += new_points
         new_path.append(current_point)
-            
-        points_to_visit.insert(0,current_point)
+
+        points_to_visit.insert(0, current_point)
 
         for i, point in enumerate(points_to_visit):
             if not previous_point:
@@ -246,8 +246,6 @@ class A_star:
                     # Aktualizacja poprzedniego punktu
                     previous_point = current_point
 
-
-
         # Powrot do punktu startowego - przemieszczenie w osi Y poza regal
         current_point = copy.copy(point)
         current_point[1] = 2
@@ -276,11 +274,10 @@ class A_star:
 
         new_path.append(end_point)
 
-        # if DEBUG_MODE:
-        print("Punkty z pośrednimi: ")
-        for item in new_path:
-            print(item)
-
+        if DEBUG_MODE:
+            print("Punkty z pośrednimi: ")
+            for item in new_path:
+                print(item)
 
         return new_path
 
@@ -326,7 +323,7 @@ def start(AREAS_FROM_DRONE):
     HEURISTIC = positions.matrix_of_distances()
     Astar_fly = A_star(
         start_location=Setpoint(1.5, 1.5, 1, 0, 0, 0),
-        end_location=Setpoint(0, 0, 1, 0, 0, 0),
+        end_location=Setpoint(1, 1, 1, 0, 0, 0),
         heuristic=HEURISTIC,
     )
     POINTS_TO_VISIT = Astar_fly.prepare_points(AREAS_FROM_DRONE)
