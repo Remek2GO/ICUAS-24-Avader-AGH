@@ -59,7 +59,7 @@ class PlantBed:
         """
         return f"Left: {self.left}\nCentre: {self.centre}\nRight: {self.right}"
 
-
+# TODO: Add collision with floor
 class Evaluator:
     """Class to evaluate the model on the test track."""
 
@@ -133,7 +133,7 @@ class Evaluator:
         if msg.bed_id not in self.plant_beds_ids.bed_ids:
             rospy.logerr(f"[Evaluator] UAV is searching wrong bed {msg.bed_id}.")
 
-        # Check if the UAV found the proper number of fruits
+        # Check if the number of fruits on the given side of the bed
         gt = None
         if msg.bed_side == 0:
             gt = self.beds_gt[msg.bed_id].left_fruits
@@ -153,6 +153,8 @@ class Evaluator:
                     f"[Evaluator] ({msg.bed_id}, {msg.bed_side}): Incorrect \
                         {count} [GT: {gt}]."
                 )
+
+        # TODO: Check also all fruits count
 
     def _calculate_collision_points(self) -> float:
         return -25 * self.collision_cnt
