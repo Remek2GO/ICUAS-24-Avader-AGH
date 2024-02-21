@@ -26,7 +26,7 @@ windows:
           waitForRos
           waitForSimulation
           sleep 2
-          rostopic pub --latch /$UAV_NAMESPACE/plants_beds std_msgs/String "Pepper 1 2 3 4 5 6 7"
+          rostopic pub --latch /$UAV_NAMESPACE/plants_beds std_msgs/String "Tomato 1 3 5 7 8 13 18 21 25"
   - arm&takeof:
       layout: tiled
       panes:
@@ -46,8 +46,7 @@ windows:
           waitForRos
           rm /root/sim_ws/src/icuas24_competition/images_eval/*.png
           rm /root/sim_ws/src/icuas24_competition/images_eval/*.txt
-          roslaunch icuas24_competition challenge.launch
-        - waitForRos; rosrun rqt_gui rqt_gui
+          roslaunch icuas24_competition challenge.launch verbosity_level:=--debug
   - evaluation:
       layout: tiled
       panes:
@@ -55,3 +54,4 @@ windows:
           rm /root/sim_ws/src/icuas24_competition/images/*.png 
           waitForRos 
           rosrun icuas24_competition evaluator.py /root/sim_ws/src/icuas24_competition/beds.csv
+        - waitForRos; rosrun rqt_gui rqt_gui

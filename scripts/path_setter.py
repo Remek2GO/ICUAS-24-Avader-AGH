@@ -26,9 +26,6 @@ from scripts.utils.types import (
 from icuas24_competition.msg import BedView, BedViewArray, UavSetpoint
 
 
-DEBUG_MODE = False
-
-
 class PathSetter:
     """Class to set the path for the tracker to follow."""
 
@@ -119,7 +116,16 @@ class PathSetter:
         """
         self.send_trajectory()
 
+        prev_tracker_status = self.tracker_status
         while not rospy.is_shutdown():
+            # TODO - It is temporary solution
+            if (
+                self.tracker_status == TrackerStatus.ACCEPT
+                and prev_tracker_status == TrackerStatus.ACTIVE
+            ):
+                self.handle_challenge_completed()
+                return
+            prev_tracker_status = self.tracker_status
             self.rate.sleep()
 
     def run_point_by_point(self):
@@ -150,20 +156,18 @@ class PathSetter:
                 and self.tracker_status == TrackerStatus.ACCEPT
             ):
                 self.path_status = PathStatus.REACHED
-                rospy.sleep(1)
-                self.pub_take_photo.publish(self.take_photo_msg)
-                self.move_on = False
+                # rospy.sleep(1)
+                # self.pub_take_photo.publish(self.take_photo_msg)
+                # self.move_on = False
 
-                if DEBUG_MODE:
-                    rospy.loginfo("[Path Setter] Take photo")
-                # rospy.loginfo("Setpoint reached")
-            elif self.path_status == PathStatus.REACHED and self.move_on:
+                # rospy.logdebug("[Path Setter] Take photo")
+                rospy.logdebug("[Path Setter] Setpoint reached")
+            elif self.path_status == PathStatus.REACHED:
                 # Set the next setpoint
-                if DEBUG_MODE:
-                    rospy.loginfo(
-                        f"[Path Setter] Setting new setpoint"
-                        f"{self.setpoints[self.idx_setpoint]}"
-                    )
+                rospy.logdebug(
+                    f"[Path Setter] Setting new setpoint"
+                    f"{self.setpoints[self.idx_setpoint]}"
+                )
                 # Send new setpoint to the tracker
                 self.set_setpoint(self.setpoints[self.idx_setpoint])
 
@@ -276,13 +280,15 @@ if __name__ == "__main__":
     frequency = float(myargv[1])
     arg_manual = "--manual" in myargv
     arg_use_points = "--use-points" in myargv
+    log_level = rospy.DEBUG if "--debug" in myargv else rospy.INFO
 
-    rospy.init_node("path_setter", anonymous=True)
+    rospy.init_node("path_setter", anonymous=True, log_level=log_level)
     rospy.loginfo(
         f"[Path Setter] Node started with params: \n"
         f"\tFrequency: {frequency} Hz\n"
         f"\tManual: {arg_manual}\n"
-        f"\tUse points: {arg_use_points}"
+        f"\tUse points: {arg_use_points}\n"
+        f"\tLog level: {log_level}"
     )
 
     path_setter = PathSetter(frequency)
