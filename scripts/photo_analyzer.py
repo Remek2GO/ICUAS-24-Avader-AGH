@@ -87,10 +87,12 @@ class PhotoAnalyzer:
             if len(self.bed_image_data_queue) > 0:
                 rospy.logdebug("[Photo Analyzer] Processing the image data")
                 bed_image_data = self.bed_image_data_queue.pop(0)
+                # TODO: Add some condition to check if the image should be processed
+                # (e.g. based on the position of the UAV)
                 img_color = bridge.imgmsg_to_cv2(bed_image_data.img_color, "bgr8")
                 img_depth = bridge.imgmsg_to_cv2(bed_image_data.img_depth, "8UC1")
-                # TODO: It is temporary solution to ensure compatibility with the
-                # previous code
+                # TODO: Odom data as a string is a temporary solution to ensure the
+                # compatibility with previous code
                 odom_data = f"{bed_image_data.odom_data.x} "
                 odom_data += f"{bed_image_data.odom_data.y} "
                 odom_data += f"{bed_image_data.odom_data.z} "
@@ -168,7 +170,7 @@ class PhotoAnalyzer:
                 current_fruit_count = self.get_fruit_count()
                 self.pub_current_fruit_count.publish(current_fruit_count)
 
-                # Only for evaluation
+                # NOTE: Evaluation only
                 if self.eval_mode:
                     # Publish the result
                     analyzer_result = AnalyzerResult(

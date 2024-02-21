@@ -13,7 +13,7 @@ from typing import Dict, List
 
 import rospy
 from cv_bridge import CvBridge
-from gazebo_msgs.msg import ModelStates
+from gazebo_msgs.msg import ContactState, ContactsState, ModelStates
 from std_msgs.msg import Bool, Int32, String
 
 from icuas24_competition.msg import AnalyzerResult
@@ -59,7 +59,7 @@ class PlantBed:
         """
         return f"Left: {self.left}\nCentre: {self.centre}\nRight: {self.right}"
 
-
+# TODO: Add collision with floor
 class Evaluator:
     """Class to evaluate the model on the test track."""
 
@@ -79,6 +79,7 @@ class Evaluator:
         self.red_prev_position: np.ndarray = None
         self.red_distance: float = 0.0
         self.final_points: float = 0.0
+        self.collision_cnt: int = 0
 
         # Load the plant beds from the CSV file to the dictionary
         # NOTE: We add a dummy bed at the beginning to match the bed_id
@@ -114,6 +115,11 @@ class Evaluator:
         rospy.loginfo(f"[Evaluator] Loaded {len(self.plant_beds) - 1} plant beds.")
 
         # ROS subscribers
+        rospy.Subscriber("/bumper/beds", ContactsState, self._collision_clb)
+        rospy.Subscriber("/bumper/wall_x0", ContactsState, self._collision_clb)
+        rospy.Subscriber("/bumper/wall_xend", ContactsState, self._collision_clb)
+        rospy.Subscriber("/bumper/wall_y0", ContactsState, self._collision_clb)
+        rospy.Subscriber("/bumper/wall_yend", ContactsState, self._collision_clb)
         rospy.Subscriber(
             "/evaluator/analyzer_result", AnalyzerResult, self._analyzer_result_clb
         )
@@ -127,7 +133,7 @@ class Evaluator:
         if msg.bed_id not in self.plant_beds_ids.bed_ids:
             rospy.logerr(f"[Evaluator] UAV is searching wrong bed {msg.bed_id}.")
 
-        # Check if the UAV found the proper number of fruits
+        # Check if the number of fruits on the given side of the bed
         gt = None
         if msg.bed_side == 0:
             gt = self.beds_gt[msg.bed_id].left_fruits
@@ -148,6 +154,11 @@ class Evaluator:
                         {count} [GT: {gt}]."
                 )
 
+        # TODO: Check also all fruits count
+
+    def _calculate_collision_points(self) -> float:
+        return -25 * self.collision_cnt
+
     def _calculate_fruit_points(self, count_val: int) -> float:
         return 50 * (1 - 4 * abs(count_val - self.fruit_count_gt) / self.fruit_count_gt)
 
@@ -158,6 +169,23 @@ class Evaluator:
     def _calculate_time_points(self, time_val: float) -> float:
         time_base = 100
         return 25 * np.exp(1 - time_val / time_base)
+
+    def _collision_clb(self, msg: ContactsState):
+        # No collision if the challenge has not started
+        if not self.fruit_count_received or not self.challenge_started_received:
+            return
+
+        state: ContactState
+        for state in msg.states:
+            if (
+                state.collision1_name == "red::base_link"
+                or state.collision2_name == "red::base_link"
+            ):
+                self.collision_cnt += 1
+                rospy.logerr(
+                    f"[Evaluator] Collision detected: {state.collision1_name} "
+                    f"with {state.collision2_name}."
+                )
 
     def _challenge_started_clb(self, msg: Bool):
         if not self.challenge_started_received and msg.data:
@@ -203,6 +231,7 @@ class Evaluator:
             and np.linalg.norm(self.red_prev_position - END_POSITION) < 0.1
             and self.fruit_count_received
         ):
+            self.final_points += self._calculate_collision_points()
             self.final_points += self._calculate_path_points(self.red_distance)
             rospy.loginfo(
                 f"[Evaluator] End position reached. Distance: {self.red_distance:.2f}."

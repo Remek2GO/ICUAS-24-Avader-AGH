@@ -1,3 +1,4 @@
+<?xml version='1.0'?>
 <sdf version='1.7'>
   <world name='default'>
     <model name='ground_plane'>
@@ -898,6 +899,24 @@
             </friction>
           </surface>
         </collision>
+        <sensor name="beds_collision" type="contact">
+          <always_on>1</always_on>
+          <visualize>0</visualize>
+          <pose frame="">0 0 0 0 -0 0</pose>
+          <topic>__default_topic__</topic>
+          <update_rate>50.0</update_rate>
+          <plugin name="beds_collision_controller" filename="libgazebo_ros_bumper.so">
+            <alwaysOn>1</alwaysOn>
+            <updateRate>5.0</updateRate>
+            <bumperTopicName>/bumper/beds</bumperTopicName>
+            <frameName>world</frameName>
+          </plugin>
+          <contact>
+            <collision>__default__</collision>
+            <topic>__default_topic__</topic>
+            <collision>icuas24_collision</collision>
+          </contact>
+        </sensor>
         <visual name='icuas24_visual'>
           <pose>0 0 0 0 -0 0</pose>
           <geometry>
@@ -913,6 +932,134 @@
       </link>
       <static>1</static>
       <pose>0 0 -0.01 0 -0 0</pose>
+    </model>
+    <model name='wall_y0'>
+      <static>true</static>
+      <link name='wall_y0_link'>
+        <collision name='wall_y0_collision'>
+          <pose>10 -0.05 7.55 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>20 0.1 15</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+        </collision>
+        <sensor name="wall_y0_sensor" type="contact">
+          <always_on>1</always_on>
+          <visualize>0</visualize>
+          <pose frame="">0 0 0 0 -0 0</pose>
+          <topic>__default_topic__</topic>
+          <update_rate>50.0</update_rate>
+          <plugin name="wall_y0_collision_controller" filename="libgazebo_ros_bumper.so">
+            <alwaysOn>1</alwaysOn>
+            <updateRate>5.0</updateRate>
+            <bumperTopicName>/bumper/wall_y0</bumperTopicName>
+            <frameName>world</frameName>
+          </plugin>
+          <contact>
+            <collision>__default__</collision>
+            <topic>__default_topic__</topic>
+            <collision>wall_y0_collision</collision>
+          </contact>
+        </sensor>
+      </link>
+    </model>
+    <model name='wall_yend'>
+      <static>true</static>
+      <link name='wall_yend_link'>
+        <collision name='wall_yend_collision'>
+          <pose>10 27.05 7.55 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>20 0.1 15</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+        </collision>
+        <sensor name="wall_yend_sensor" type="contact">
+          <always_on>1</always_on>
+          <visualize>0</visualize>
+          <pose frame="">0 0 0 0 -0 0</pose>
+          <topic>__default_topic__</topic>
+          <update_rate>50.0</update_rate>
+          <plugin name="wall_yend_collision_controller" filename="libgazebo_ros_bumper.so">
+            <alwaysOn>1</alwaysOn>
+            <updateRate>5.0</updateRate>
+            <bumperTopicName>/bumper/wall_yend</bumperTopicName>
+            <frameName>world</frameName>
+          </plugin>
+          <contact>
+            <collision>__default__</collision>
+            <topic>__default_topic__</topic>
+            <collision>wall_yend_collision</collision>
+          </contact>
+        </sensor>
+      </link>
+    </model>
+    <model name='wall_x0'>
+      <static>true</static>
+      <link name='wall_x0_link'>
+        <collision name='wall_x0_collision'>
+          <pose>-0.05 13.5 7.55 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.1 27 15</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+        </collision>
+        <sensor name="wall_x0_sensor" type="contact">
+          <always_on>1</always_on>
+          <visualize>0</visualize>
+          <pose frame="">0 0 0 0 -0 0</pose>
+          <topic>__default_topic__</topic>
+          <update_rate>50.0</update_rate>
+          <plugin name="wall_x0_collision_controller" filename="libgazebo_ros_bumper.so">
+            <alwaysOn>1</alwaysOn>
+            <updateRate>5.0</updateRate>
+            <bumperTopicName>/bumper/wall_x0</bumperTopicName>
+            <frameName>world</frameName>
+          </plugin>
+          <contact>
+            <collision>__default__</collision>
+            <topic>__default_topic__</topic>
+            <collision>wall_x0_collision</collision>
+          </contact>
+        </sensor>
+      </link>
+    </model>
+    <model name='wall_xend'>
+      <static>true</static>
+      <link name='wall_xend_link'>
+        <collision name='wall_xend_collision'>
+          <pose>20.05 13.5 7.55 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.1 27 15</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+        </collision>
+        <sensor name="wall_xend_sensor" type="contact">
+          <always_on>1</always_on>
+          <visualize>0</visualize>
+          <pose frame="">0 0 0 0 -0 0</pose>
+          <topic>__default_topic__</topic>
+          <update_rate>50.0</update_rate>
+          <plugin name="wall_xend_collision_controller" filename="libgazebo_ros_bumper.so">
+            <alwaysOn>1</alwaysOn>
+            <updateRate>5.0</updateRate>
+            <bumperTopicName>/bumper/wall_xend</bumperTopicName>
+            <frameName>world</frameName>
+          </plugin>
+          <contact>
+            <collision>__default__</collision>
+            <topic>__default_topic__</topic>
+            <collision>wall_xend_collision</collision>
+          </contact>
+        </sensor>
+      </link>
     </model>
     <model name='plant_1'>
       <link name='pepper_2'>
