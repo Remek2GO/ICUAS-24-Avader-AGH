@@ -73,7 +73,7 @@ class PhotoAnalyzer:
                 patches, patches_coords, img_rotated = get_patches(
                     img_color, img_depth, odom_data
                 )
-                for i, patch, patch_coords in enumerate(zip(patches, patches_coords)):
+                for i, (patch, patch_coords) in enumerate(zip(patches, patches_coords)):
                     fruit_count, fruit_type, fruit_centres = process_patch(patch)
                     # Mark plants
                     cv2.rectangle(
