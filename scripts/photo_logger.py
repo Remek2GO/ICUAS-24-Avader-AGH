@@ -204,7 +204,7 @@ class PhotoLogger:
             # rospy.logdebug(f"[Photo Logger] Roll: {odom_data[ROLL_IDX]} "
             #                f"Yaw diff: {yaw_diff}")
             if (
-                odom_data[ROLL_IDX] < ROLL_THRESHOLD
+                np.abs(odom_data[ROLL_IDX]) < ROLL_THRESHOLD
                 and yaw_diff < YAW_THRESHOLD
             ):
                 img_color = bridge.imgmsg_to_cv2(self.current_color_msg, "bgr8")

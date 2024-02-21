@@ -63,12 +63,12 @@ def get_distance(p1_indeces: Tuple[int, int], p2_indeces: Tuple[int, int]) -> fl
         # The same side of the beds, so the distance is just the euclidean distance
         return np.sqrt(
             (p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2 + (p1[2] - p2[2]) ** 2
-        )
+        ) + abs(p1[5] - p2[5]) / 2
     elif p1_indeces[0] == 0 or p2_indeces == 0:
         # One of the points is the start position, so the distance is the sum of the
         # euclidean distance and the distance to the start position
         distance = np.sqrt(abs(p2[0] - p1[0]) ** 2 + max(p1[2], p2[2]) ** 2)
-        distance += max(abs(p1[1] - 2), abs(p2[1] - 2))
+        distance += max(abs(p1[1] - 2), abs(p2[1] - 2)) + abs(p1[5] - p2[5]) / 2
         return distance
     else:
         # Both points are on different sides of the beds, so the distance is the sum of
@@ -78,7 +78,7 @@ def get_distance(p1_indeces: Tuple[int, int], p2_indeces: Tuple[int, int]) -> fl
         distance += min(
             abs(p1[1] - 2) + abs(p2[1] - 2), abs(p1[1] - 25) + abs(p2[1] - 25)
         )
-        distance = np.sqrt(distance**2 + (p1[2] - p2[2]) ** 2)
+        distance = np.sqrt(distance**2 + (p1[2] - p2[2]) ** 2) + abs(p1[5] - p2[5]) / 2
         return distance
 
 

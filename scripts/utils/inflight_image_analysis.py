@@ -172,7 +172,7 @@ if __name__ == "__main__":
     # NOTE: We use set to remove duplicates
     bed_ids = list(
         {
-            name.split("_")[0][0]
+            name.split("_")[0][:-1]
             for name in os.listdir(IMAGES_FOLDER_PATH)
             if not name.startswith(".")
         }
@@ -181,7 +181,7 @@ if __name__ == "__main__":
 
     for bed_id in bed_ids:
         for bed_side in bed_sides:
-            unique_id = f"{bed_id}{bed_side}"
+            unique_id = f"{bed_id}{bed_side}_"
 
             # Get all files with name starting with id
             files = [
@@ -191,16 +191,17 @@ if __name__ == "__main__":
             ]
 
             no_images = len(files) // 3
+            print(f"Processing {no_images} images for {unique_id}")
             for i in range(no_images):
                 img_color = cv2.imread(
-                    f"{IMAGES_FOLDER_PATH}/{unique_id}_{i}_eval_color.png"
+                    f"{IMAGES_FOLDER_PATH}/{unique_id}{i}_eval_color.png"
                 )
                 img_depth = cv2.imread(
-                    f"{IMAGES_FOLDER_PATH}/{unique_id}_{i}_eval_depth.png",
+                    f"{IMAGES_FOLDER_PATH}/{unique_id}{i}_eval_depth.png",
                     cv2.IMREAD_GRAYSCALE,
                 )
                 with open(
-                    f"{IMAGES_FOLDER_PATH}/{unique_id}_{i}_eval_odom.txt", "r"
+                    f"{IMAGES_FOLDER_PATH}/{unique_id}{i}_eval_odom.txt", "r"
                 ) as f:
                     odom = f.readline()
 
@@ -216,5 +217,6 @@ if __name__ == "__main__":
                         2,
                     )
 
-                cv2.imshow("Image rotated", img_rotated)
-                cv2.waitKey(0)
+                cv2.imshow(f"Image rotated_{bed_id}_{i}", img_rotated)
+                cv2.waitKey(1)
+                # cv2.destroyAllWindows()
