@@ -22,6 +22,7 @@ class A_star:
         self.path = []
 
         self.num_chebyshev_between_beds = 15
+        self.num_chebyshev_between_beds_angle = self.num_chebyshev_between_beds + 10
         self.num_chebyshev_back_to_start = 10
         self.num_chebyshev_along_beds_to_start = 10
         self.num_chebyshev_change_beds = 3
@@ -301,14 +302,19 @@ def chebyshev_nodes(n, a, b):
 def generate_intermediate_points(previous_point, point, n):
     a = np.array(previous_point)
     b = np.array(point)
-    xk_norm = chebyshev_nodes(n, a[:3], b[:3])
-    xk_norm_angle = chebyshev_nodes(n+10, a[3:], b[3:])
+    xk_norm = chebyshev_nodes(n, a, b)
+    # xk_norm_angle = chebyshev_nodes(n, a, b)
+
+    mid_point = len(xk_norm) // 2
+    for i in range(mid_point):
+        xk_norm[i][3:] = previous_point[3:]
 
     new_points = []
     for i in range(len(xk_norm)):
         interpoint = copy.deepcopy(previous_point)
-        interpoint[:3] = xk_norm[i]
-        interpoint[3:] = xk_norm_angle[i]
+        interpoint = xk_norm[i]
+        # interpoint[:3] = xk_norm[i]
+        # interpoint[3:] = xk_norm_angle[i]
         new_points.append(interpoint)
 
     return new_points
