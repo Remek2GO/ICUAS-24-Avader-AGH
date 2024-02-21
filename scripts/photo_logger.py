@@ -27,7 +27,7 @@ PROXIMITY_THRESHOLD = 0.2  # 0.1
 ROLL_IDX = 3
 ROLL_THRESHOLD = 6 * np.pi / 180
 YAW_IDX = 5
-YAW_THRESHOLD = 6 * np.pi / 180
+YAW_THRESHOLD = 3 * np.pi / 180
 
 
 class PhotoLogger:
@@ -187,7 +187,7 @@ class PhotoLogger:
             else:
                 closest_idx = closest_idx[0]
             bed_view = self.bed_view_encoding[closest_idx]
-            rospy.logdebug(f"[Photo Logger] Closest bed view: {bed_view}")
+            # rospy.logdebug(f"[Photo Logger] Closest bed view: {bed_view}")
 
             # Check if we have already taken enough images of the current bed view
             if self.bed_images[bed_view] >= self.max_images:
@@ -201,8 +201,8 @@ class PhotoLogger:
             yaw_diff = self._get_yaw_error(
                 odom_data[YAW_IDX], self.bed_view_poses[closest_idx, YAW_IDX]
             )
-            rospy.logdebug(f"[Photo Logger] Roll: {odom_data[ROLL_IDX]} "
-                           f"Yaw diff: {yaw_diff}")
+            # rospy.logdebug(f"[Photo Logger] Roll: {odom_data[ROLL_IDX]} "
+            #                f"Yaw diff: {yaw_diff}")
             if (
                 odom_data[ROLL_IDX] < ROLL_THRESHOLD
                 and yaw_diff < YAW_THRESHOLD

@@ -268,6 +268,13 @@ class PathSetter:
             self.rate.sleep()
         rospy.loginfo("[Path Setter] Challenge started")
 
+    def wait_for_plants_beds_msg(self):
+        """Wait for the plant beds message to be received."""
+        rospy.loginfo("[Path Setter] Waiting for plant beds message")
+        while self.plant_beds is None:
+            self.rate.sleep()
+        rospy.loginfo("[Path Setter] Plant beds received")
+
 
 if __name__ == "__main__":
     myargv = rospy.myargv(argv=sys.argv)
@@ -291,10 +298,11 @@ if __name__ == "__main__":
         f"\tLog level: {log_level}"
     )
 
+    # Create the path setter and wait for the plant beds message
     path_setter = PathSetter(frequency)
-    path_setter.wait_for_challenge_start()
-    challenge_start_time = rospy.get_time()
+    path_setter.wait_for_plants_beds_msg()
 
+    # Create trajectory
     if arg_manual:
         # Manual setpoints
         x = input("X:")
@@ -315,16 +323,14 @@ if __name__ == "__main__":
             path_setter.add_setpoint(Setpoint(*setpoint))
         rospy.loginfo(f"[Path Setter] Generated photo poses: {photo_poses}")
 
+    # Wait for the challenge to start
+    path_setter.wait_for_challenge_start()
     if arg_use_points:
         # Fly poiny by point
         path_setter.run_point_by_point()
     else:
         # Send the entire trajectory
         path_setter.send_photo_poses(photo_poses)
-        rospy.loginfo(
-            f"[Path Setter] Sending trajectory, "
-            f"delta = {rospy.get_time() - challenge_start_time}"
-        )
         path_setter.run_continuous()
 
     rospy.spin()

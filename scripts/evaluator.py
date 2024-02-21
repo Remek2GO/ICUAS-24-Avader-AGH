@@ -78,6 +78,7 @@ class Evaluator:
         self.fruit_count_gt: int = None
         self.red_prev_position: np.ndarray = None
         self.red_distance: float = 0.0
+        self.final_points: float = 0.0
 
         # Load the plant beds from the CSV file to the dictionary
         # NOTE: We add a dummy bed at the beginning to match the bed_id
@@ -147,6 +148,17 @@ class Evaluator:
                         {count} [GT: {gt}]."
                 )
 
+    def _calculate_fruit_points(self, count_val: int) -> float:
+        return 50 * (1 - 4 * abs(count_val - self.fruit_count_gt) / self.fruit_count_gt)
+
+    def _calculate_path_points(self, distance_val: float) -> float:
+        path_base = 150
+        return 25 * np.exp(2 * (1 - distance_val / path_base))
+
+    def _calculate_time_points(self, time_val: float) -> float:
+        time_base = 100
+        return 25 * np.exp(1 - time_val / time_base)
+
     def _challenge_started_clb(self, msg: Bool):
         if not self.challenge_started_received and msg.data:
             self.challenge_started_received = True
@@ -157,6 +169,7 @@ class Evaluator:
 
     def _fruit_count_clb(self, msg: Int32):
         self.fruit_count_received = True
+        self.final_points += self._calculate_fruit_points(msg.data)
 
         # Check if the UAV found the proper number of fruits
         if msg.data == self.fruit_count_gt:
@@ -190,15 +203,17 @@ class Evaluator:
             and np.linalg.norm(self.red_prev_position - END_POSITION) < 0.1
             and self.fruit_count_received
         ):
+            self.final_points += self._calculate_path_points(self.red_distance)
             rospy.loginfo(
                 f"[Evaluator] End position reached. Distance: {self.red_distance:.2f}."
             )
             if self.start_time is not None:
-                rospy.loginfo(
-                    f"[Evaluator] Time taken: {rospy.get_time() - self.start_time:.2f}."
-                )
+                final_time = rospy.get_time() - self.start_time
+                self.final_points += self._calculate_time_points(final_time)
+                rospy.loginfo(f"[Evaluator] Time taken: {final_time:.2f}.")
             else:
                 rospy.logwarn("[Evaluator] Time start not received.")
+            rospy.loginfo(f"[Evaluator] Final points: {self.final_points:.1f}.")
             rospy.signal_shutdown("End position reached.")
         self.red_prev_position = red_position
 

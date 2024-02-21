@@ -63,6 +63,10 @@ class PhotoAnalyzer:
 
     def _image_data_clb(self, msg: BedImageData):
         self.bed_image_data_queue.append(msg)
+        rospy.logdebug(
+            f"[Photo Analyzer] New image data received. Queue size: "
+            f"{len(self.bed_image_data_queue)}"
+        )
 
     def get_fruit_count(self) -> int:
         """Get the total fruit count.
