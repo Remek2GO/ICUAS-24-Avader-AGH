@@ -193,18 +193,13 @@ class A_star:
                     edge_previous_point = copy.copy(previous_point)
                     current_point = copy.deepcopy(point)
 
-                    if i + 1 < len(points_to_visit):
-                        # new_previous_point[5] =  np.pi / 2
-                        edge_previous_point[5] = points_to_visit[i + 1][
-                            5
-                        ]  # obrot taki jak nastepny punkt
-                    else:
-                        edge_previous_point[5] = 0  # poczatkowa wartosc obrotu yaw
-
+                    edge_previous_point[5] = current_point[5]  # obrot taki jak nastepny punkt
                     if abs(previous_point[1] - 25) > abs(previous_point[1] - 2):
                         edge_previous_point[1] = 2
                     else:
                         edge_previous_point[1] = 25
+
+
 
                     # chebyshev nodes - interpolacja
                     new_points = generate_intermediate_points(
@@ -274,10 +269,10 @@ class A_star:
 
         new_path.append(end_point)
 
-        if DEBUG_MODE:
-            print("Punkty z pośrednimi: ")
-            for item in new_path:
-                print(item)
+        # if DEBUG_MODE:
+        # print("Punkty z pośrednimi: ")
+        # for item in new_path:
+        #     print(item)
 
         return new_path
 
@@ -306,12 +301,14 @@ def chebyshev_nodes(n, a, b):
 def generate_intermediate_points(previous_point, point, n):
     a = np.array(previous_point)
     b = np.array(point)
-    xk_norm = chebyshev_nodes(n, a, b)
+    xk_norm = chebyshev_nodes(n, a[:3], b[:3])
+    xk_norm_angle = chebyshev_nodes(n+10, a[3:], b[3:])
 
     new_points = []
     for i in range(len(xk_norm)):
         interpoint = copy.deepcopy(previous_point)
-        interpoint = xk_norm[i]
+        interpoint[:3] = xk_norm[i]
+        interpoint[3:] = xk_norm_angle[i]
         new_points.append(interpoint)
 
     return new_points
