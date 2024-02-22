@@ -12,17 +12,86 @@ from dataclasses import dataclass
 from typing import Dict, List
 
 import rospy
-from cv_bridge import CvBridge
-from gazebo_msgs.msg import ContactState, ContactsState, ModelStates
+
+# from cv_bridge import CvBridge
+from gazebo_msgs.msg import ModelStates
 from geometry_msgs.msg import Pose
 from std_msgs.msg import Bool, Int32, String
+from tf.transformations import quaternion_matrix
 
 from icuas24_competition.msg import AnalyzerResult
 from scripts.utils.types import PlantBedsIds, PlantType
 
-IMAGES_FOLDER_PATH = "/root/sim_ws/src/icuas24_competition/images"
-BRIDGE = CvBridge()
+ARENA_CUBE = np.array(
+    [
+        # [x, y, z]
+        [0.0, 0.0, 0.0],
+        [0.0, 27.0, 0.0],
+        [20.0, 27.0, 0.0],
+        [20.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0],
+        [0.0, 27.0, 0.0],
+        [20.0, 27.0, 0.0],
+        [20.0, 0.0, 0.0],
+    ]
+)
+BED_CUBES = [
+    np.array(
+        [
+            # [x, y, z]
+            [2.95, 2.95, 0.0],
+            [2.95, 24.05, 0.0],
+            [5.05, 24.05, 0.0],
+            [5.05, 2.95, 0.0],
+            [2.95, 2.95, 9.0],
+            [2.95, 24.05, 9.0],
+            [5.05, 24.05, 9.0],
+            [5.05, 2.95, 9.0],
+        ]
+    ),
+    np.array(
+        [
+            # [x, y, z]
+            [8.95, 2.95, 0.0],
+            [8.95, 24.05, 0.0],
+            [11.05, 24.05, 0.0],
+            [11.05, 2.95, 0.0],
+            [8.95, 2.95, 9.0],
+            [8.95, 24.05, 9.0],
+            [11.05, 24.05, 9.0],
+            [11.05, 2.95, 9.0],
+        ]
+    ),
+    np.array(
+        [
+            # [x, y, z]
+            [14.95, 2.95, 0.0],
+            [14.95, 24.05, 0.0],
+            [17.05, 24.05, 0.0],
+            [17.05, 2.95, 0.0],
+            [14.95, 2.95, 9.0],
+            [14.95, 24.05, 9.0],
+            [17.05, 24.05, 9.0],
+            [17.05, 2.95, 9.0],
+        ]
+    ),
+]
+# BRIDGE = CvBridge()
 END_POSITION = np.array([1.0, 1.0])
+# IMAGES_FOLDER_PATH = "/root/sim_ws/src/icuas24_competition/images"
+UAV_BOUNDARY_VECTORS = np.array(
+    [
+        # [x, y, z]
+        [0.525, 0.525, 0.1],
+        [0.525, -0.525, 0.1],
+        [-0.525, -0.525, 0.1],
+        [-0.525, 0.525, 0.1],
+        [0.525, 0.525, -0.4],
+        [0.525, -0.525, -0.4],
+        [-0.525, -0.525, -0.4],
+        [-0.525, 0.525, -0.4],
+    ]
+)
 
 
 @dataclass
@@ -83,6 +152,8 @@ class Evaluator:
         self.red_prev_position: np.ndarray = None
         self.red_distance: float = 0.0
         self.final_points: float = 0.0
+        self.uav_in_collision: bool = False
+        self.collision_bed_id: int = -1
         self.collision_cnt: int = 0
 
         # Load the plant beds from the CSV file to the dictionary
@@ -119,11 +190,6 @@ class Evaluator:
         rospy.loginfo(f"[Evaluator] Loaded {len(self.plant_beds) - 1} plant beds.")
 
         # ROS subscribers
-        rospy.Subscriber("/bumper/beds", ContactsState, self._collision_clb)
-        # rospy.Subscriber("/bumper/wall_x0", ContactsState, self._collision_clb)
-        # rospy.Subscriber("/bumper/wall_xend", ContactsState, self._collision_clb)
-        # rospy.Subscriber("/bumper/wall_y0", ContactsState, self._collision_clb)
-        # rospy.Subscriber("/bumper/wall_yend", ContactsState, self._collision_clb)
         rospy.Subscriber(
             "/evaluator/analyzer_result", AnalyzerResult, self._analyzer_result_clb
         )
@@ -155,9 +221,9 @@ class Evaluator:
         if count == gt:
             rospy.loginfo(f"[Evaluator] ({msg.bed_id}, {msg.bed_side}): Correct {gt}.")
         else:
-            rospy.logerr(
-                f"[Evaluator] ({msg.bed_id}, {msg.bed_side}): Incorrect "
-                f"{count} [GT: {gt}]."
+            rospy.loginfo(
+                f"\033[31m[Evaluator] ({msg.bed_id}, {msg.bed_side}): Incorrect "
+                f"{count} [GT: {gt}].\033[0m"
             )
 
         # Check all fruits count when both sides were counted
@@ -186,22 +252,6 @@ class Evaluator:
     def _calculate_time_points(self, time_val: float) -> float:
         time_base = 100
         return 25 * np.exp(1 - time_val / time_base)
-
-    def _collision_clb(self, msg: ContactsState):
-        # No collision if the challenge has not started
-        if not self.fruit_count_received or not self.challenge_started_received:
-            return
-
-        state: ContactState
-        for state in msg.states:
-            if state.collision1_name.startswith(
-                "red::"
-            ) or state.collision2_name.startswith("red::"):
-                self.collision_cnt += 1
-                rospy.logerr(
-                    f"[Evaluator] Collision detected: {state.collision1_name} "
-                    f"with {state.collision2_name}."
-                )
 
     def _challenge_started_clb(self, msg: Bool):
         if not self.challenge_started_received and msg.data:
@@ -253,7 +303,59 @@ class Evaluator:
         red_position = np.array(
             [red_pose.position.x, red_pose.position.y, red_pose.position.z]
         )
+        red_rotation = quaternion_matrix(
+            [
+                red_pose.orientation.x,
+                red_pose.orientation.y,
+                red_pose.orientation.z,
+                red_pose.orientation.w,
+            ]
+        )[:3, :3]
+        boundary_points = np.matrix(
+            np.matmul(red_rotation, UAV_BOUNDARY_VECTORS.T)
+            + np.matrix(red_position).getT()
+        ).getT()
 
+        # Check arena boundaries
+        if (
+            not self.uav_in_collision
+            and len(self._outside_test(boundary_points, ARENA_CUBE)) > 0
+        ):
+            self.uav_in_collision = True
+            self.collision_cnt += 1
+            rospy.loginfo("\033[31m[Evaluator] UAV left the arena.\033[0m")
+        elif (
+            self.uav_in_collision
+            and len(self._outside_test(boundary_points, ARENA_CUBE)) == 0
+        ):
+            self.uav_in_collision = False
+            rospy.loginfo("[Evaluator] UAV re-entered the arena.")
+
+        # Check plant beds boundaries
+        # for i, cube in enumerate(BED_CUBES):
+        #     rospy.loginfo(
+        #         f"[Evaluator] Checking plant bed {cube}: "
+        #         f"{self._outside_test(boundary_points, cube)}."
+        #     )
+            # if self.collision_bed_id == -1 and len(
+            #     self._outside_test(boundary_points, cube)
+            # ) < len(UAV_BOUNDARY_VECTORS):
+            #     self.collision_bed_id = i
+            #     self.collision_cnt += 1
+            #     rospy.loginfo(
+            #         f"\033[31m[Evaluator] UAV collided with plant bed {i}.\033[0m"
+            #     )
+            #     break
+            # elif (
+            #     self.collision_bed_id == i
+            #     and len(self._outside_test(boundary_points, cube))
+            #     == len(UAV_BOUNDARY_VECTORS)
+            # ):
+            #     self.uav_in_collision = False
+            #     self.collision_bed_id = -1
+            #     rospy.loginfo(f"[Evaluator] UAV left plant bed {i}.")
+
+        # Distance + position check
         if self.red_prev_position is not None:
             # Accumulate the distance travelled by the UAV
             self.red_distance += np.linalg.norm(red_position - self.red_prev_position)
@@ -267,11 +369,11 @@ class Evaluator:
                 rospy.loginfo("[Evaluator] End position reached.")
                 self.final_points += self._calculate_collision_points()
                 self.final_points += self._calculate_path_points(self.red_distance)
-                rospy.loginfo(f"Distance: {self.red_distance:.2f}.")
+                rospy.loginfo(f"[Evaluator] Distance: {self.red_distance:.2f}.")
                 if self.start_time is not None:
                     final_time = rospy.get_time() - self.start_time
                     self.final_points += self._calculate_time_points(final_time)
-                    rospy.loginfo(f"[Evaluator] Time taken: {final_time:.2f}.")
+                    rospy.loginfo(f"[Evaluator] Time: {final_time:.2f}.")
                 else:
                     rospy.logwarn("[Evaluator] Time start not received.")
                 rospy.loginfo(
@@ -282,6 +384,42 @@ class Evaluator:
         else:
             self.red_distance = 0.0
         self.red_prev_position = red_position
+
+    def _outside_test(self, points: np.ndarray, cube3d: np.ndarray) -> List[int]:
+        """Check if the points are outside or in the boundary of the 3D cube.
+
+        Args:
+            points (np.ndarray): Points to check as numpy array with shape (N, 3).
+            cube3d (np.ndarray): 3D cube as numpy array with shape (8, 3) with the \
+                coordinates in the clockwise order. The first 4 points are the bottom \
+                and the last 4 points are the top.
+
+        Returns:
+            List[int]: List of indices of the points that are outside the cube.
+        """
+        b1, b2, _, b4, t1, _, t3, _ = cube3d
+
+        dir1 = t1 - b1
+        size1 = np.linalg.norm(dir1)
+        dir1 = dir1 / size1
+
+        dir2 = b2 - b1
+        size2 = np.linalg.norm(dir2)
+        dir2 = dir2 / size2
+
+        dir3 = b4 - b1
+        size3 = np.linalg.norm(dir3)
+        dir3 = dir3 / size3
+
+        cube3d_center = (b1 + t3) / 2.0
+
+        dir_vec = points - cube3d_center
+
+        res1 = np.where((np.absolute(np.dot(dir_vec, dir1)) * 2) >= size1)[0]
+        res2 = np.where((np.absolute(np.dot(dir_vec, dir2)) * 2) >= size2)[0]
+        res3 = np.where((np.absolute(np.dot(dir_vec, dir3)) * 2) >= size3)[0]
+
+        return list(set().union(res1, res2, res3))
 
     def _plants_beds_clb(self, msg: String):
         self.plants_beds_received = True

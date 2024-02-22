@@ -61,9 +61,10 @@ def get_distance(p1_indeces: Tuple[int, int], p2_indeces: Tuple[int, int]) -> fl
     p2 = POINTS_OF_INTEREST[p2_indeces[0]][p2_indeces[1]]
     if p1[0] == p2[0]:
         # The same side of the beds, so the distance is just the euclidean distance
-        return np.sqrt(
-            (p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2 + (p1[2] - p2[2]) ** 2
-        ) + abs(p1[5] - p2[5]) / 2
+        return (
+            np.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2 + (p1[2] - p2[2]) ** 2)
+            + abs(p1[5] - p2[5]) / 2
+        )
     elif p1_indeces[0] == 0 or p2_indeces == 0:
         # One of the points is the start position, so the distance is the sum of the
         # euclidean distance and the distance to the start position
