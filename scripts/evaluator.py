@@ -216,7 +216,6 @@ class Evaluator:
         self.final_points += self._calculate_fruit_points(msg.data)
 
         # Print fruit count summary
-        rospy.loginfo("[Evaluator] Fruit count summary:")
         for bed_id in self.beds_results:
             gt = self.beds_gt[bed_id].all_fruits
             count = self.beds_results[bed_id].all_fruits
@@ -265,19 +264,20 @@ class Evaluator:
                 and np.linalg.norm(self.red_prev_position[:2] - END_POSITION) < 0.1
                 and self.fruit_count_received
             ):
+                rospy.loginfo("[Evaluator] End position reached.")
                 self.final_points += self._calculate_collision_points()
                 self.final_points += self._calculate_path_points(self.red_distance)
-                rospy.loginfo(
-                    f"[Evaluator] End position reached. "
-                    f"Distance: {self.red_distance:.2f}."
-                )
+                rospy.loginfo(f"Distance: {self.red_distance:.2f}.")
                 if self.start_time is not None:
                     final_time = rospy.get_time() - self.start_time
                     self.final_points += self._calculate_time_points(final_time)
                     rospy.loginfo(f"[Evaluator] Time taken: {final_time:.2f}.")
                 else:
                     rospy.logwarn("[Evaluator] Time start not received.")
-                rospy.loginfo(f"[Evaluator] Final points: {self.final_points:.1f}.")
+                rospy.loginfo(
+                    f"\033[1;33m[Evaluator] Final points: "
+                    f"{self.final_points:.1f}.\033[0m"
+                )
                 rospy.signal_shutdown("End position reached.")
         else:
             self.red_distance = 0.0
