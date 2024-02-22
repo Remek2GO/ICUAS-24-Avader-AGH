@@ -145,7 +145,12 @@ class PhotoAnalyzer:
                 patches, patches_coords, img_rotated = get_patches(
                     img_color, img_depth, odom_data
                 )
-                for i, (patch, patch_coords) in enumerate(zip(patches, patches_coords)):
+                #NOTE Dodaje sortowanie:
+                # Sort Patches
+                z_patches = zip(patches, patches_coords)
+                z_patches_sort = sorted(z_patches, key=lambda x: x[1][2])
+
+                for i, (patch, patch_coords) in enumerate(z_patches_sort):
                     fruit_count, fruit_type, fruit_centres = process_patch(patch)
                     # Mark plants
                     cv2.rectangle(
