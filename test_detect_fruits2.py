@@ -353,91 +353,92 @@ if __name__ == "__main__":
             plant_side.fruit_type,
         )
 
-    cv2.imshow(f"Image rotated_{bed_id}_{i}", img_rotated)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    #cv2.imshow(f"Image rotated_{bed_id}_{i}", img_rotated)
+    #cv2.waitKey(0)
+    #cv2.destroyAllWindows()
 
-    print(f"Bed {bed_id}")
-    for fruit_type in [PlantType.TOMATO, PlantType.EGGPLANT, PlantType.PEPPER]:
-        fruit_sum = plant_beds[bed_id].get_bed_fruit_count(fruit_type)
-        fruit_right = plant_beds[bed_id].get_bed_fruit_count_right(fruit_type)
-        fruit_left = plant_beds[bed_id].get_bed_fruit_count_left(fruit_type)
+        print(f"Bed {bed_id}")
+        for fruit_type in [PlantType.TOMATO, PlantType.EGGPLANT, PlantType.PEPPER]:
+            fruit_sum = plant_beds[bed_id].get_bed_fruit_count(fruit_type)
+            fruit_right = plant_beds[bed_id].get_bed_fruit_count_right(fruit_type)
+            fruit_left = plant_beds[bed_id].get_bed_fruit_count_left(fruit_type)
 
-        print(f"Fruit type: {fruit_type}")
-        print(f"Total fruit count: {fruit_sum}")
-        print(f"Right fruit count: {fruit_right}")
-        print(f"Left fruit count: {fruit_left}")
-
-
-        if csv_plant_beds[bed_id - 1].left.plant_type == fruit_type:
             print(f"Fruit type: {fruit_type}")
             print(f"VIS right fruit count: {fruit_right}")
             print(f"VIS left fruit count: {fruit_left}")
             print(f"VIS total fruit count: {fruit_sum}")
 
-            
+
             if csv_plant_beds[bed_id - 1].left.plant_type == fruit_type:
                 print(f"Fruit type: {fruit_type}")
-                print(f"CSV left fruit count: {csv_plant_beds[bed_id - 1].left.left_fruits}")
-                print(f"CSV right fruit count: {csv_plant_beds[bed_id - 1].left.right_fruits}")
-                print(f"CSV total fruit count: {csv_plant_beds[bed_id - 1].left.all_fruits}")
+                print(f"VIS right fruit count: {fruit_right}")
+                print(f"VIS left fruit count: {fruit_left}")
+                print(f"VIS total fruit count: {fruit_sum}")
 
-                if csv_plant_beds[bed_id - 1].left.left_fruits != fruit_left:
-                    print(f"Left fruit count does not match")
-                    error = True
                 
-                if csv_plant_beds[bed_id - 1].left.right_fruits != fruit_right:
-                    print(f"Right fruit count does not match")
-                    error = True
-                
+                if csv_plant_beds[bed_id - 1].left.plant_type == fruit_type:
+                    print(f"Fruit type: {fruit_type}")
+                    print(f"CSV left fruit count: {csv_plant_beds[bed_id - 1].left.left_fruits}")
+                    print(f"CSV right fruit count: {csv_plant_beds[bed_id - 1].left.right_fruits}")
+                    print(f"CSV total fruit count: {csv_plant_beds[bed_id - 1].left.all_fruits}")
+
+                    if csv_plant_beds[bed_id - 1].left.left_fruits != fruit_left:
+                        print(f"Left fruit count does not match")
+                        error = True
+                    
+                    if csv_plant_beds[bed_id - 1].left.right_fruits != fruit_right:
+                        print(f"Right fruit count does not match")
+                        error = True
+                    
+                    if csv_plant_beds[bed_id - 1].left.all_fruits != fruit_sum:
+                        print(f"All fruit count does not match")
+                        error = True
+
                 if csv_plant_beds[bed_id - 1].left.all_fruits != fruit_sum:
                     print(f"All fruit count does not match")
                     error = True
 
-            if csv_plant_beds[bed_id - 1].left.all_fruits != fruit_sum:
-                print(f"All fruit count does not match")
+                if csv_plant_beds[bed_id - 1].centre.plant_type == fruit_type:
+                    print(f"Fruit type: {fruit_type}")
+                    print(f"CSV left fruit count: {csv_plant_beds[bed_id - 1].centre.left_fruits}")
+                    print(f"CSV right fruit count: {csv_plant_beds[bed_id - 1].centre.right_fruits}")
+                    print(f"CSV total fruit count: {csv_plant_beds[bed_id - 1].centre.all_fruits}")
 
-            if csv_plant_beds[bed_id - 1].centre.plant_type == fruit_type:
-                print(f"Fruit type: {fruit_type}")
-                print(f"CSV left fruit count: {csv_plant_beds[bed_id - 1].centre.left_fruits}")
-                print(f"CSV right fruit count: {csv_plant_beds[bed_id - 1].centre.right_fruits}")
-                print(f"CSV total fruit count: {csv_plant_beds[bed_id - 1].centre.all_fruits}")
+                    if csv_plant_beds[bed_id - 1].centre.left_fruits != fruit_left:
+                        print(f"Left fruit count does not match")
+                        error = True
 
-                if csv_plant_beds[bed_id - 1].centre.left_fruits != fruit_left:
-                    print(f"Left fruit count does not match")
-                    error = True
+                    if csv_plant_beds[bed_id - 1].centre.right_fruits != fruit_right:
+                        print(f"Right fruit count does not match")
+                        error = True
 
-                if csv_plant_beds[bed_id - 1].centre.right_fruits != fruit_right:
-                    print(f"Right fruit count does not match")
-                    error = True
+                    if csv_plant_beds[bed_id - 1].centre.all_fruits != fruit_sum:
+                        print(f"All fruit count does not match")
+                        error = True
 
-                if csv_plant_beds[bed_id - 1].centre.all_fruits != fruit_sum:
-                    print(f"All fruit count does not match")
-                    error = True
+                if csv_plant_beds[bed_id - 1].right.plant_type == fruit_type:
+                    print(f"Fruit type: {fruit_type}")
+                    print(f"CSV left fruit count: {csv_plant_beds[bed_id - 1].right.left_fruits}")
+                    print(f"CSV right fruit count: {csv_plant_beds[bed_id - 1].right.right_fruits}")
+                    print(f"CSV total fruit count: {csv_plant_beds[bed_id - 1].right.all_fruits}")
 
-            if csv_plant_beds[bed_id - 1].right.plant_type == fruit_type:
-                print(f"Fruit type: {fruit_type}")
-                print(f"CSV left fruit count: {csv_plant_beds[bed_id - 1].right.left_fruits}")
-                print(f"CSV right fruit count: {csv_plant_beds[bed_id - 1].right.right_fruits}")
-                print(f"CSV total fruit count: {csv_plant_beds[bed_id - 1].right.all_fruits}")
+                    if csv_plant_beds[bed_id - 1].right.left_fruits != fruit_left:
+                        print(f"Left fruit count does not match")
+                        error = True
 
-                if csv_plant_beds[bed_id - 1].right.left_fruits != fruit_left:
-                    print(f"Left fruit count does not match")
-                    error = True
+                    if csv_plant_beds[bed_id - 1].right.right_fruits != fruit_right:
+                        print(f"Right fruit count does not match")
+                        error = True
 
-                if csv_plant_beds[bed_id - 1].right.right_fruits != fruit_right:
-                    print(f"Right fruit count does not match")
-                    error = True
+                    if csv_plant_beds[bed_id - 1].right.all_fruits != fruit_sum:
+                        print(f"All fruit count does not match")
+                        error = True
 
-                if csv_plant_beds[bed_id - 1].right.all_fruits != fruit_sum:
-                    print(f"All fruit count does not match")
-                    error = True
-
-        if error:
-            cv2.imshow(f"Image 0 rotated_{bed_id}_{i}", img_rotated_0)
-            cv2.imshow(f"Image 1 rotated_{bed_id}_{i}", img_rotated_1)
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
+            if error:
+                cv2.imshow(f"Image 0 rotated_{bed_id}_{i}", img_rotated_0)
+                cv2.imshow(f"Image 1 rotated_{bed_id}_{i}", img_rotated_1)
+                cv2.waitKey(0)
+                cv2.destroyAllWindows()
 
 
 
