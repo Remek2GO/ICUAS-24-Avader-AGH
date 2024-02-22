@@ -300,7 +300,6 @@ class Evaluator:
         for bed_id in self.beds_gt:
             if not all(self.beds_counted[bed_id]):
                 rospy.logerr(f"[Evaluator] Bed {bed_id} not fully counted.")
-
         # Check if the UAV found the proper number of fruits
         if msg.data == self.fruit_count_gt:
             rospy.loginfo(
@@ -327,14 +326,15 @@ class Evaluator:
         ymin, ymax = bounds[1]
         zmin, zmax = bounds[2]
 
-        # Find point inside the boundaries
-        points_inside = np.where(
-            np.logical_and(
-                np.logical_and(points[:, 0] > xmin, points[:, 0] < xmax),
-                np.logical_and(points[:, 1] > ymin, points[:, 1] < ymax),
-                np.logical_and(points[:, 2] > zmin, points[:, 2] < zmax),
-            )
-        )[0]
+        # Check if the points are inside the boundaries
+        points_inside = []
+        for i in range(len(points)):
+            if (
+                xmin < points[i, 0] < xmax
+                and ymin < points[i, 1] < ymax
+                and zmin < points[i, 2] < zmax
+            ):
+                points_inside.append(i)
 
         return len(points_inside)
 
@@ -344,6 +344,11 @@ class Evaluator:
             red_idx = msg.name.index("red")
         except ValueError:
             return
+
+        # No measurements before start
+        if not (self.challenge_started_received and self.plants_beds_received):
+            return
+
         red_pose: Pose = msg.pose[red_idx]
         red_position = np.array(
             [red_pose.position.x, red_pose.position.y, red_pose.position.z]
