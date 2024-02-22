@@ -933,7 +933,7 @@
       <static>1</static>
       <pose>0 0 -0.01 0 -0 0</pose>
     </model>
-    <model name='wall_y0'>
+    <!-- <model name='wall_y0'>
       <static>true</static>
       <link name='wall_y0_link'>
         <collision name='wall_y0_collision'>
@@ -1060,7 +1060,7 @@
           </contact>
         </sensor>
       </link>
-    </model>
+    </model> -->
     <model name='plant_1'>
       <link name='pepper_2'>
         <inertial>
