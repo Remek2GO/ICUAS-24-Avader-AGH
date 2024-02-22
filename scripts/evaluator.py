@@ -78,7 +78,8 @@ class Evaluator:
         self.plant_beds_ids: PlantBedsIds = None
         self.beds_gt: Dict[int, Plant] = {}
         self.fruit_count_gt: int = None
-        self.beds_counted: Dict[int, List[bool, bool]] = {}
+        self.beds_results: Dict[int, Plant] = {}
+        self.beds_counted: Dict[int, List[bool]] = {}
         self.red_prev_position: np.ndarray = None
         self.red_distance: float = 0.0
         self.final_points: float = 0.0
@@ -135,8 +136,9 @@ class Evaluator:
         # Check if UAV is searching the proper bed
         if msg.bed_id not in self.plant_beds_ids.bed_ids:
             rospy.logerr(f"[Evaluator] UAV is searching wrong bed {msg.bed_id}.")
+            return
 
-        # Check if the number of fruits on the given side of the bed
+        # Get the number of fruits on the given side of the bed
         gt = None
         if msg.bed_side == 0:
             gt = self.beds_gt[msg.bed_id].left_fruits
@@ -146,28 +148,30 @@ class Evaluator:
             count = msg.fruit_right
         else:
             rospy.logerr(f"[Evaluator] Invalid bed side {msg.bed_side}.")
-        if gt is not None:
-            self.beds_counted[msg.bed_id][msg.bed_side] = True
-            if count == gt:
-                rospy.loginfo(
-                    f"[Evaluator] ({msg.bed_id}, {msg.bed_side}): Correct {gt}."
-                )
-            else:
-                rospy.logerr(
-                    f"[Evaluator] ({msg.bed_id}, {msg.bed_side}): Incorrect \
-                        {count} [GT: {gt}]."
-                )
+            return
+
+        # Check the number of fruits on the given side of the bed
+        self.beds_counted[msg.bed_id][msg.bed_side] = True
+        if count == gt:
+            rospy.loginfo(f"[Evaluator] ({msg.bed_id}, {msg.bed_side}): Correct {gt}.")
+        else:
+            rospy.logerr(
+                f"[Evaluator] ({msg.bed_id}, {msg.bed_side}): Incorrect "
+                f"{count} [GT: {gt}]."
+            )
 
         # Check all fruits count when both sides were counted
-        if all(self.beds_counted[msg.bed_id]):
-            gt = self.beds_gt[msg.bed_id].all_fruits
-            count = msg.fruit_left + msg.fruit_right
-            if count == gt:
-                rospy.loginfo(f"[Evaluator] ({msg.bed_id}): Correct {gt}.")
-            else:
-                rospy.logerr(
-                    f"[Evaluator] ({msg.bed_id}): Incorrect {count} [GT: {gt}]."
-                )
+        if msg.bed_id not in self.beds_results:
+            self.beds_results[msg.bed_id] = Plant(
+                self.plant_beds_ids.plant_type,
+                all_fruits=msg.fruit_sum,
+                left_fruits=msg.fruit_left,
+                right_fruits=msg.fruit_right,
+            )
+        else:
+            self.beds_results[msg.bed_id].all_fruits = msg.fruit_sum
+            self.beds_results[msg.bed_id].left_fruits = msg.fruit_left
+            self.beds_results[msg.bed_id].right_fruits = msg.fruit_right
 
     def _calculate_collision_points(self) -> float:
         return -25 * self.collision_cnt
@@ -211,13 +215,33 @@ class Evaluator:
         self.fruit_count_received = True
         self.final_points += self._calculate_fruit_points(msg.data)
 
+        # Print fruit count summary
+        rospy.loginfo("[Evaluator] Fruit count summary:")
+        for bed_id in self.beds_results:
+            gt = self.beds_gt[bed_id].all_fruits
+            count = self.beds_results[bed_id].all_fruits
+            if count == gt:
+                rospy.loginfo(
+                    f"\033[32m[Evaluator] ({bed_id}): Correct final sum {gt}.\033[0m"
+                )
+            else:
+                rospy.loginfo(
+                    f"\033[31m[Evaluator] ({bed_id}): Incorrect final sum {count} "
+                    f"[GT: {gt}].\033[0m"
+                )
+        for bed_id in self.beds_gt:
+            if not all(self.beds_counted[bed_id]):
+                rospy.logerr(f"[Evaluator] Bed {bed_id} not fully counted.")
+
         # Check if the UAV found the proper number of fruits
         if msg.data == self.fruit_count_gt:
-            rospy.loginfo(f"[Evaluator] Correct fruit count: {msg.data}.")
+            rospy.loginfo(
+                f"\033[32m[Evaluator] Correct fruit count: {msg.data}.\033[0m"
+            )
         else:
-            rospy.logerr(
-                f"[Evaluator] Incorrect fruit count: {msg.data} \
-                [GT: {self.fruit_count_gt}]."
+            rospy.loginfo(
+                f"\033[31m[Evaluator] Incorrect fruit count: {msg.data} "
+                f"[GT: {self.fruit_count_gt}].\033[0m"
             )
 
     def _model_states_clb(self, msg: ModelStates):
