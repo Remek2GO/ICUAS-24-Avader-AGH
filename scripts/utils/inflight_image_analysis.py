@@ -105,14 +105,27 @@ def get_patches(
     # Image segmentation - looking for plants (squares)
     hsv = cv2.cvtColor(img_color_rotated, cv2.COLOR_BGR2HSV)
     plants_mask = mask_plants(hsv)
+    #cv2.imshow("B1", plants_mask * 20)
+    plants_mask = cv2.medianBlur(plants_mask, 11)
+    #cv2.imshow("B2", plants_mask * 20)
 
     # img_depth_rotated = cv2.cvtColor(img_depth_rotated, cv2.COLOR_BGR2GRAY)
     result = cv2.multiply(plants_mask, img_depth_rotated)
-    result = cv2.medianBlur(result, 5)
-    # cv2.imshow("B", plants_mask * 10)
+    #result = cv2.medianBlur(result, 5)
+  
+    
+    #cv2.imshow("B", plants_mask * 20)
 
-    plant_mask = np.uint8(result == 3) * 255
-    # cv2.imshow("B", plant_mask)
+    plant_mask = np.uint8(result == 3)
+    #cv2.imshow("DX",img_depth_rotated*20)
+    #cv2.imshow("BX", plants_mask*255)
+    #cv2.imshow("BXX", plant_mask)
+
+    plant_mask = cv2.medianBlur(plant_mask, 5)
+
+    mask = cv2.cvtColor(plant_mask, cv2.COLOR_GRAY2BGR)
+
+    cv2.imshow("B", cv2.multiply(mask,img_color_rotated))
 
     rotors_mask = mask_rotors(hsv)
     # cv2.imshow("Rotors", rotors_mask)
@@ -125,9 +138,10 @@ def get_patches(
         left, top, width, height, area = stats[i]
 
         # Magic correction
+        top = top + 3
         left = left + 12
         width = width - 24
-        height = height - 12
+        height = height - 12-3
         # TODO Dodatkowe warunki a ten sprawdzic
         # TODO Korekcja ramki
         sqare_ratio = width / height
@@ -154,13 +168,14 @@ def get_patches(
             if not rotors_in_fov:
                 # TODO Polaczyc z dylatacja
                 # Reczna korekcja (wynika z rozmiaru dylatacji)
-                # cv2.rectangle(
-                #     img_color_rotated,
-                #     (left, top),
-                #     (left + width, top + height),
-                #     255,
-                #     2,
-                # )
+                cv2.rectangle(
+                     img_color_rotated,
+                     (left, top),
+                     (left + width, top + height),
+                     255,
+                     2,
+                )
+                cv2.imshow("TEst",img_color_rotated)
                 patches.append(hsv[top : top + height, left : left + width])
                 patches_coords.append((top, top + height, left, left + width))
 
