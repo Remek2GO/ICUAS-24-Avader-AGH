@@ -104,7 +104,7 @@ if __name__ == "__main__":
                     cv2.destroyAllWindows()
     else:
 
-        name = "171_25"
+        name = "131_22"
 
         img_color = cv2.imread(
                         f"{IMAGES_FOLDER_PATH}/{name}_eval_color.png"
