@@ -119,6 +119,10 @@ class PhotoAnalyzer:
                 )
                 if bed_view not in self.bed_view_errors:
                     self.bed_view_errors[bed_view] = current_error
+                    
+                # Add the plant to the plant bed if it does not exist
+                if bed_image_data.bed_id not in self.plant_beds:
+                    self.plant_beds[bed_image_data.bed_id] = PlantBed()
 
                 if current_error > self.bed_view_errors[bed_view]:
                     rospy.logdebug(
@@ -185,10 +189,6 @@ class PhotoAnalyzer:
                         fruit_position=fruit_centres,
                         fruit_type=plant_type,
                     )
-
-                    # Add the plant to the plant bed if it does not exist
-                    if bed_image_data.bed_id not in self.plant_beds:
-                        self.plant_beds[bed_image_data.bed_id] = PlantBed()
 
                     # Reverse the index if the bed side is 1
                     idx = i if bed_image_data.bed_side == 0 else len(patches) - i - 1

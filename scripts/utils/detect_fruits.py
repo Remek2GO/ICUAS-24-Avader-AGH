@@ -64,8 +64,8 @@ def process_patch(patch: Patch) -> Tuple[int, int, np.ndarray]:
         # if k == 0 or k == 2:
         #    mask = cv2.erode(mask, kernel_3)
         #    mask = cv2.erode(mask, kernel_3)
-        # cv2.imshow("Mask", mask)
-        # cv2.waitKey(0)
+        #cv2.imshow("Mask", mask)
+        #cv2.waitKey(0)
 
         num_labels, _, stats, _ = cv2.connectedComponentsWithStats(mask)
         fruit_count = 0
@@ -73,8 +73,9 @@ def process_patch(patch: Patch) -> Tuple[int, int, np.ndarray]:
             left, top, width, height, area = stats[i]
             bbox_area = width * height
 
-            # print(bbox_area, "|", area, "|", area / bbox_area)
-            if bbox_area > 200 and area > 100:
+            #print(bbox_area, "|", area, "|", area / bbox_area)
+            #TODO Ew. tylko dla baklazana
+            if bbox_area > 150 and area > 100:
                 mask_small = mask[top : top + height, left : left + width]
                 dist = cv2.distanceTransform(mask_small, cv2.DIST_L2, 3)
                 cv2.normalize(dist, dist, 0, 1.0, cv2.NORM_MINMAX)
@@ -83,8 +84,8 @@ def process_patch(patch: Patch) -> Tuple[int, int, np.ndarray]:
                 _, dist_th = cv2.threshold(dist, 0.70, 255, cv2.THRESH_BINARY)
                 dist_th = np.uint8(dist_th)
 
-                # cv2.imshow("Dist T", dist_th)
-                # cv2.waitKey(0)
+                #cv2.imshow("Dist T", dist_th)
+                #cv2.waitKey(0)
 
                 num_labels_small, _, stats_small, centroids_small = (
                     cv2.connectedComponentsWithStats(dist_th)
