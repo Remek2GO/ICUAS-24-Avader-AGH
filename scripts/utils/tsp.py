@@ -36,6 +36,15 @@ class TSP:
 
 
 def intermediate_points(points_to_visit):
+    """Function to generate intermediate points for the drone to visit (including exiting and entering the shelves and returning to the starting point).
+
+    Args:
+        points_to_visit (List[PointOfInterest]): List of points to visit.
+
+    Returns:
+        List[PointOfInterest]: List of intermediate points for the drone to visit.
+
+    """
     new_path = []
     previous_point = None
 
@@ -216,31 +225,34 @@ def prepare_points(points_from_drone):
     return example_of_points
 
 
-def get_photo_poses(tour, points_indexes):
+def get_photo_poses(points_indexes):
+    """Change"""
     setpoints = []
-    for i in range(len(tour)):
-        setpoints.append(
-            POINTS_OF_INTEREST[points_indexes[tour[i]] // 2][
-                points_indexes[tour[i]] % 2
-            ]
-        )
+    for idx in points_indexes:
+        setpoints.append(POINTS_OF_INTEREST[idx // 2][idx % 2])
     return setpoints[1:]
 
 
 def start(AREAS_FROM_DRONE):
+    # Change 2-D indexes to 1-D indexes
     points_indexes = prepare_points(AREAS_FROM_DRONE)
     print(f"Points indexes: {points_indexes}")
+
     distance_matrix = create_distance_matrix(points_indexes)
+
+    # NOTE: TSP algorithm can only handle integer distances
     distance_matrix_int = (distance_matrix * 100.0).astype(int)
     tsp = TSP(distance_matrix_int)
     tour = tsp.solve()
     print(f"Tour: {tour}")
 
+    # Change tour indeces to 1-D points indeces
     points_indexes = [0, *points_indexes]
     sorted_points = [points_indexes[i] for i in tour]
     print(f"Sorted points: {sorted_points}")
 
-    target_points = get_photo_poses(tour, points_indexes)
+    # Change 1-D indexes to setpoints [x, y, z, roll, pitch, yaw]
+    target_points = get_photo_poses(sorted_points)
     print(f"Target points: {target_points}")
 
     setpoints = intermediate_points(target_points)
