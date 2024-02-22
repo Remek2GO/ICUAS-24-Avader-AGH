@@ -18,3 +18,5 @@ COPY . .
 
 # Step 4: Build the Catkin workspace
 RUN catkin build --limit-status-rate 0.2
+
+RUN pip install fast-tsp
