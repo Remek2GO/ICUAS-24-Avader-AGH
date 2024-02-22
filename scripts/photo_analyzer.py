@@ -119,7 +119,7 @@ class PhotoAnalyzer:
                 )
                 if bed_view not in self.bed_view_errors:
                     self.bed_view_errors[bed_view] = current_error
-                    
+
                 # Add the plant to the plant bed if it does not exist
                 if bed_image_data.bed_id not in self.plant_beds:
                     self.plant_beds[bed_image_data.bed_id] = PlantBed()
@@ -145,7 +145,13 @@ class PhotoAnalyzer:
                 patches, patches_coords, img_rotated = get_patches(
                     img_color, img_depth, odom_data
                 )
-                for i, (patch, patch_coords) in enumerate(zip(patches, patches_coords)):
+
+                # Sort patches based on their location
+                z_patches = zip(patches, patches_coords)
+                z_patches_sort = sorted(z_patches, key=lambda x: x[1][2])
+
+                # Process each patch
+                for i, (patch, patch_coords) in enumerate(z_patches_sort):
                     fruit_count, fruit_type, fruit_centres = process_patch(patch)
                     # Mark plants
                     cv2.rectangle(

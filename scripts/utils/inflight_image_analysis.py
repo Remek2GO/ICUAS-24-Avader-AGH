@@ -144,7 +144,10 @@ def get_patches(
         height = height - 12-3
         # TODO Dodatkowe warunki a ten sprawdzic
         # TODO Korekcja ramki
-        sqare_ratio = width / height
+        if height > 0:
+            sqare_ratio = width / height
+        else:
+            sqare_ratio = 0
         # print(f"SQUARE = {sqare_ratio} AREA = {area}")
 
         if area > 100 * 100 and sqare_ratio > 1 and sqare_ratio < 1.3:
