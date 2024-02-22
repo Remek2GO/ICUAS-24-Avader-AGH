@@ -14,7 +14,7 @@ from tf.transformations import quaternion_from_euler
 from trajectory_msgs.msg import MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
 from typing import List
 
-from scripts.utils import A_star
+from scripts.utils import A_star, tsp
 from scripts.utils.types import (
     PlantType,
     TrackerStatus,
@@ -318,7 +318,8 @@ if __name__ == "__main__":
         )
     else:
         # A* setpoints
-        setpoints, photo_poses = A_star.start(path_setter.plant_beds.bed_ids)
+        # setpoints, photo_poses = A_star.start(path_setter.plant_beds.bed_ids)
+        setpoints, photo_poses = tsp.start(path_setter.plant_beds.bed_ids)
         for setpoint in setpoints:
             path_setter.add_setpoint(Setpoint(*setpoint))
         rospy.loginfo(f"[Path Setter] Generated photo poses: {photo_poses}")

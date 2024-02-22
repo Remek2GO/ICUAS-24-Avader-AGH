@@ -8,7 +8,7 @@ sys.path.append(BASE_DIR)
 import numpy as np
 import copy
 import fast_tsp
-from positions import (
+from .positions import (
     PointOfInterest,
     get_distance,
     POINTS_OF_INTEREST,
@@ -224,7 +224,7 @@ def get_photo_poses(tour, points_indexes):
                 points_indexes[tour[i]] % 2
             ]
         )
-    return setpoints[2:]
+    return setpoints[1:]
 
 
 def start(AREAS_FROM_DRONE):
@@ -239,13 +239,16 @@ def start(AREAS_FROM_DRONE):
     points_indexes = [0, *points_indexes]
     sorted_points = [points_indexes[i] for i in tour]
     print(f"Sorted points: {sorted_points}")
-    photo_poses = get_photo_poses(tour, points_indexes)
-    setpoints = intermediate_points(photo_poses)
+
+    target_points = get_photo_poses(tour, points_indexes)
+    print(f"Target points: {target_points}")
+
+    setpoints = intermediate_points(target_points)
 
     length = fast_tsp.compute_cost(tour, distance_matrix_int)
     print(f"Tour length: {length/100.0}")
 
-    return setpoints, photo_poses
+    return setpoints, [points_indexes[i] for i in tour]
 
 
 if __name__ == "__main__":
