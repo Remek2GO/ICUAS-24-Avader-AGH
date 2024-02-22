@@ -123,9 +123,9 @@ def get_patches(
 
     plant_mask = cv2.medianBlur(plant_mask, 5)
 
-    mask = cv2.cvtColor(plant_mask, cv2.COLOR_GRAY2BGR)
+    # mask = cv2.cvtColor(plant_mask, cv2.COLOR_GRAY2BGR)
 
-    cv2.imshow("B", cv2.multiply(mask,img_color_rotated))
+    # cv2.imshow("B", cv2.multiply(mask,img_color_rotated))
 
     rotors_mask = mask_rotors(hsv)
     # cv2.imshow("Rotors", rotors_mask)
@@ -175,7 +175,7 @@ def get_patches(
                      255,
                      2,
                 )
-                cv2.imshow("TEst",img_color_rotated)
+                # cv2.imshow("TEst",img_color_rotated)
                 patches.append(hsv[top : top + height, left : left + width])
                 patches_coords.append((top, top + height, left, left + width))
 
