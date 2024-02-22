@@ -35,7 +35,7 @@ class A_star:
         # print("MST")
         open_list_copy = copy.copy(self.open_list)
 
-        # open_list_copy.remove(setpoint) # nie usuwanie wybranego punktu
+        open_list_copy.remove(setpoint) # nie usuwanie wybranego punktu
         N = open_list_copy
         # print("Open list copy (update): ", open_list_copy)
         selected_node = np.zeros(len(N))
@@ -50,8 +50,6 @@ class A_star:
             a = 0
             b = 0
             for m in N:
-                # print("M: ", m)
-                # print("Selected node: ", selected_node[N.index(m)], "N index: ", N.index(m))
                 if selected_node[N.index(m)]:
                     for n in N:
                         if not selected_node[N.index(n)]:
@@ -89,7 +87,6 @@ class A_star:
             if DEBUG_MODE:
                 print("\n Aktualna pozycja: ", current_node / 2, " \n")
             if len(self.open_list) != 1:
-                # print("Open list: ", self.open_list)
                 for setpoint in self.open_list:
 
                     h_cost = self.MST(setpoint)
