@@ -165,6 +165,10 @@ if __name__ == "__main__":
 
             no_images = len(files) // 3
             print(f"Processing {no_images} images for {unique_id}")
+            best_img_color = []
+            best_img_depth = []
+            best_odom_data = []
+            
             for i in range(no_images):
                 img_color = cv2.imread(
                     f"{IMAGES_FOLDER_PATH}/{unique_id}{i}_eval_color.png"
@@ -230,99 +234,114 @@ if __name__ == "__main__":
 
                 if current_error > bed_view_errors[bed_view]:
                     continue
+                else:
+                    best_img_color = img_color
+                    best_img_depth = img_depth
+                    best_odom_data = odom_data
 
+            # Tu by się zaczeła analiza tego najlepszego ?
+            #cv2.imshow("Best shot",best_img_color)
+            #cv2.waitKey(0)
 
-                if (
-                roll_diff < photo_logger.ROLL_THRESHOLD
-                and pitch_diff < photo_logger.PITCH_THRESHOLD
-                and yaw_diff < photo_logger.YAW_THRESHOLD
-                ):
-
-                    best_bed = (bed_id, bed_side, i)
-
-            best_all_bed.append(best_bed)
-
-for bed_id, bed_side, i in best_all_bed:
-    
-    img_color = cv2.imread(
-        f"{IMAGES_FOLDER_PATH}/{unique_id}{i}_eval_color.png"
-    )
-    img_depth = cv2.imread(
-        f"{IMAGES_FOLDER_PATH}/{unique_id}{i}_eval_depth.png",
-        cv2.IMREAD_GRAYSCALE,
-    )
-    with open(
-        f"{IMAGES_FOLDER_PATH}/{unique_id}{i}_eval_odom.txt", "r"
-    ) as f:
-        odom = f.readline()
-
-
-    patches, patches_coords, img_rotated = get_patches(
-        img_color, img_depth, odom
-    )
-
-    for p in patches_coords:
-        top, bottom, left, right = p
-        cv2.rectangle(
-            img_rotated,
-            (left, top),
-            (right, bottom),
-            (0, 255, 0),
-            2,
-        )
-
-
-    for k, (patch, patch_coords) in enumerate(zip(patches, patches_coords)):
-        fruit_count, fruit_type, fruit_centres = process_patch(patch)
-        # Mark plants
-        cv2.rectangle(
-            img_rotated,
-            (patch_coords[2], patch_coords[0]),
-            (patch_coords[3], patch_coords[1]),
-            (255, 0, 0),
-            2,
-        )
-        # Mark fruits
-        for centre in fruit_centres:
-            cv2.circle(
-                img_rotated,
-                (
-                    int(
-                        centre[1] * (patch_coords[3] - patch_coords[2])
-                        + patch_coords[2]
-                    ),
-                    int(
-                        centre[0] * (patch_coords[1] - patch_coords[0])
-                        + patch_coords[0]
-                    ),
-                ),
-                5,
-                (0, 255, 0),
-                -1,
+            patches, patches_coords, img_rotated = get_patches(
+                img_color, img_depth, odom
             )
 
-        # Check fruit type
-        plant_type = PlantType.EMPTY
-        if fruit_type == 0:
-            plant_type = PlantType.TOMATO
-        elif fruit_type == 1:
-            plant_type = PlantType.EGGPLANT
-        elif fruit_type == 2:
-            plant_type = PlantType.PEPPER
+            for p in patches_coords:
+                top, bottom, left, right = p
+                cv2.rectangle(
+                    img_rotated,
+                    (left, top),
+                    (right, bottom),
+                    (0, 255, 0),
+                    2,
+                )
 
-        # Save the obtained data
-        plant_side = PlantSideCount(
-            fruit_count=fruit_count,
-            fruit_position=fruit_centres,
-            fruit_type=plant_type,
-        )
+            # Sort Patches
+            z_patches = zip(patches, patches_coords)
+            z_patches_sort = sorted(z_patches, key=lambda x: x[1][2])
 
-        # Add the plant to the plant bed if it does not exist
-        if bed_id not in plant_beds:
-            plant_beds[bed_id] = PlantBed()
+            for k, (patch, patch_coords) in enumerate(z_patches_sort):
+                fruit_count, fruit_type, fruit_centres = process_patch(patch)
+                #print(f"TYPE = {fruit_type} COUTN = {fruit_count}")
+                # Mark plants
+                cv2.rectangle(
+                    img_rotated,
+                    (patch_coords[2], patch_coords[0]),
+                    (patch_coords[3], patch_coords[1]),
+                    (255, 0, 0),
+                    2,
+                )
+                # Mark fruits
+                for centre in fruit_centres:
+                    cv2.circle(
+                        img_rotated,
+                        (
+                            int(
+                                centre[1] * (patch_coords[3] - patch_coords[2])
+                                + patch_coords[2]
+                            ),
+                            int(
+                                centre[0] * (patch_coords[1] - patch_coords[0])
+                                + patch_coords[0]
+                            ),
+                        ),
+                        5,
+                        (0, 255, 0),
+                        -1,
+                    )
 
-        # Reverse the index if the bed side is 1
-        idx = k if bed_side == 0 else len(patches) - k - 1
+                # Check fruit type
+                plant_type = PlantType.EMPTY
+                if fruit_type == 0:
+                    plant_type = PlantType.TOMATO
+                    #print(f"TOMATO {fruit_count}")
+                elif fruit_type == 1:
+                    plant_type = PlantType.EGGPLANT
+                    #print(f"EGGPLANT {fruit_count}")
+                elif fruit_type == 2:
+                    plant_type = PlantType.PEPPER
+                    #print(f"PEPPER {fruit_count}")
+                #else:
+                    #print(f"EMPTY {fruit_count}")
+                    
+                # Save the obtained data
+                plant_side = PlantSideCount(
+                    fruit_count=fruit_count,
+                    fruit_position=fruit_centres,
+                    fruit_type=plant_type,
+                )
+
+                # Add the plant to the plant bed if it does not exist
+                if bed_id not in plant_beds:
+                    plant_beds[bed_id] = PlantBed()
+
+                # Reverse the index if the bed side is 1
+                idx = k if bed_side == 0 else len(patches) - k - 1
+
+                
+                # Gather the data
+                plant_beds[bed_id].set_plant(
+                    idx,
+                    bed_side,
+                    plant_side.fruit_count,
+                    plant_side.fruit_position.copy(),
+                    plant_side.fruit_type,
+                )
+            if bed_side == 0:
+                img_rotated_0 = img_rotated
+            else:
+                img_rotated_1 = img_rotated
+            #cv2.imshow(f"Image rotated_{bed_id}_{i}", img_rotated)
+            #cv2.waitKey(1)
+            #cv2.destroyAllWindows()
+
+        print(f"Bed {bed_id}")
+        error = False
+        for fruit_type in [PlantType.TOMATO, PlantType.EGGPLANT, PlantType.PEPPER]:
+            fruit_sum = plant_beds[bed_id].get_bed_fruit_count(fruit_type)
+            fruit_right = plant_beds[bed_id].get_bed_fruit_count_right(fruit_type)
+            fruit_left = plant_beds[bed_id].get_bed_fruit_count_left(fruit_type)
 
         
         # Gather the data
@@ -352,50 +371,73 @@ for bed_id, bed_side, i in best_all_bed:
 
         if csv_plant_beds[bed_id - 1].left.plant_type == fruit_type:
             print(f"Fruit type: {fruit_type}")
-            print(f"CSV Left fruit count: {csv_plant_beds[bed_id - 1].left.left_fruits}")
-            print(f"CSV right fruit count: {csv_plant_beds[bed_id - 1].left.right_fruits}")
-            print(f"CSV all fruit count: {csv_plant_beds[bed_id - 1].left.all_fruits}")
+            print(f"VIS right fruit count: {fruit_right}")
+            print(f"VIS left fruit count: {fruit_left}")
+            print(f"VIS total fruit count: {fruit_sum}")
 
-            if csv_plant_beds[bed_id - 1].left.left_fruits != fruit_left:
-                print(f"Left fruit count does not match")
+            
+            if csv_plant_beds[bed_id - 1].left.plant_type == fruit_type:
+                print(f"Fruit type: {fruit_type}")
+                print(f"CSV left fruit count: {csv_plant_beds[bed_id - 1].left.left_fruits}")
+                print(f"CSV right fruit count: {csv_plant_beds[bed_id - 1].left.right_fruits}")
+                print(f"CSV total fruit count: {csv_plant_beds[bed_id - 1].left.all_fruits}")
 
-            if csv_plant_beds[bed_id - 1].left.right_fruits != fruit_right:
-                print(f"Right fruit count does not match")
+                if csv_plant_beds[bed_id - 1].left.left_fruits != fruit_left:
+                    print(f"Left fruit count does not match")
+                    error = True
+                
+                if csv_plant_beds[bed_id - 1].left.right_fruits != fruit_right:
+                    print(f"Right fruit count does not match")
+                    error = True
+                
+                if csv_plant_beds[bed_id - 1].left.all_fruits != fruit_sum:
+                    print(f"All fruit count does not match")
+                    error = True
 
             if csv_plant_beds[bed_id - 1].left.all_fruits != fruit_sum:
                 print(f"All fruit count does not match")
 
+            if csv_plant_beds[bed_id - 1].centre.plant_type == fruit_type:
+                print(f"Fruit type: {fruit_type}")
+                print(f"CSV left fruit count: {csv_plant_beds[bed_id - 1].centre.left_fruits}")
+                print(f"CSV right fruit count: {csv_plant_beds[bed_id - 1].centre.right_fruits}")
+                print(f"CSV total fruit count: {csv_plant_beds[bed_id - 1].centre.all_fruits}")
 
-        if csv_plant_beds[bed_id - 1].centre.plant_type == fruit_type:
-            print(f"Fruit type: {fruit_type}")
-            print(f"CSV left fruit count: {csv_plant_beds[bed_id - 1].centre.left_fruits}")
-            print(f"CSV right fruit count: {csv_plant_beds[bed_id - 1].centre.right_fruits}")
-            print(f"CSV all fruit count: {csv_plant_beds[bed_id - 1].centre.all_fruits}")
+                if csv_plant_beds[bed_id - 1].centre.left_fruits != fruit_left:
+                    print(f"Left fruit count does not match")
+                    error = True
 
-            if csv_plant_beds[bed_id - 1].centre.left_fruits != fruit_left:
-                print(f"Left fruit count does not match")
+                if csv_plant_beds[bed_id - 1].centre.right_fruits != fruit_right:
+                    print(f"Right fruit count does not match")
+                    error = True
 
-            if csv_plant_beds[bed_id - 1].centre.right_fruits != fruit_right:
-                print(f"Right fruit count does not match")
+                if csv_plant_beds[bed_id - 1].centre.all_fruits != fruit_sum:
+                    print(f"All fruit count does not match")
+                    error = True
 
-            if csv_plant_beds[bed_id - 1].centre.all_fruits != fruit_sum:
-                print(f"All fruit count does not match")
+            if csv_plant_beds[bed_id - 1].right.plant_type == fruit_type:
+                print(f"Fruit type: {fruit_type}")
+                print(f"CSV left fruit count: {csv_plant_beds[bed_id - 1].right.left_fruits}")
+                print(f"CSV right fruit count: {csv_plant_beds[bed_id - 1].right.right_fruits}")
+                print(f"CSV total fruit count: {csv_plant_beds[bed_id - 1].right.all_fruits}")
 
-        if csv_plant_beds[bed_id - 1].right.plant_type == fruit_type:
-            print(f"Fruit type: {fruit_type}")
-            print(f"CSV left fruit count: {csv_plant_beds[bed_id - 1].right.left_fruits}")
-            print(f"CSV right fruit count: {csv_plant_beds[bed_id - 1].right.right_fruits}")
-            print(f"CSV all fruit count: {csv_plant_beds[bed_id - 1].right.all_fruits}")
+                if csv_plant_beds[bed_id - 1].right.left_fruits != fruit_left:
+                    print(f"Left fruit count does not match")
+                    error = True
 
-            if csv_plant_beds[bed_id - 1].right.left_fruits != fruit_left:
-                print(f"Left fruit count does not match")
+                if csv_plant_beds[bed_id - 1].right.right_fruits != fruit_right:
+                    print(f"Right fruit count does not match")
+                    error = True
 
-            if csv_plant_beds[bed_id - 1].right.right_fruits != fruit_right:
-                print(f"Right fruit count does not match")
+                if csv_plant_beds[bed_id - 1].right.all_fruits != fruit_sum:
+                    print(f"All fruit count does not match")
+                    error = True
 
-            if csv_plant_beds[bed_id - 1].right.all_fruits != fruit_sum:
-                print(f"All fruit count does not match")
-
+        if error:
+            cv2.imshow(f"Image 0 rotated_{bed_id}_{i}", img_rotated_0)
+            cv2.imshow(f"Image 1 rotated_{bed_id}_{i}", img_rotated_1)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
 
 
 
