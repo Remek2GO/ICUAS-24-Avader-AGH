@@ -163,8 +163,8 @@ class A_star:
         new_points = generate_intermediate_points(
             start_point, current_point, self.num_chebyshev_between_beds
         )
-        #new_path += new_points
-        #new_path.append(current_point)
+        # new_path += new_points
+        # new_path.append(current_point)
 
         points_to_visit.insert(0, current_point)
 
@@ -181,14 +181,16 @@ class A_star:
 
                     # chebyshev nodes - interpolacja
                     new_points = generate_intermediate_points(
-                        previous_point, current_point, self.num_chebyshev_between_beds, False
+                        previous_point,
+                        current_point,
+                        self.num_chebyshev_between_beds,
+                        False,
                     )
                     new_path += new_points
 
                     # powtorzenie punktu docelowego n razy
                     for i in range(self.num_times_repeat_point):
                         new_path.append(current_point)
-
 
                     previous_point = current_point
 
@@ -198,19 +200,20 @@ class A_star:
                     edge_previous_point = copy.copy(previous_point)
                     current_point = copy.deepcopy(point)
 
-                    edge_previous_point[5] = current_point[5]  # obrot taki jak nastepny punkt
+                    edge_previous_point[5] = current_point[
+                        5
+                    ]  # obrot taki jak nastepny punkt
                     if abs(previous_point[1] - 25) > abs(previous_point[1] - 2):
                         edge_previous_point[1] = 2
                     else:
                         edge_previous_point[1] = 25
 
-
-
                     # chebyshev nodes - interpolacja
                     new_points = generate_intermediate_points(
                         previous_point,
                         edge_previous_point,
-                        self.num_chebyshev_change_beds,False
+                        self.num_chebyshev_change_beds,
+                        False,
                     )
                     new_path += new_points
 
@@ -245,7 +248,6 @@ class A_star:
                     for i in range(self.num_times_repeat_point):
                         new_path.append(current_point)
 
-
                     # Aktualizacja poprzedniego punktu
                     previous_point = current_point
 
@@ -273,13 +275,8 @@ class A_star:
         new_points = generate_intermediate_points(
             current_point, end_point, self.num_chebyshev_back_to_start
         )
-        #new_path += new_points
-
-        previous_end_point = copy.copy(end_point)
-        previous_end_point[2] = 2
-
-        new_path.append(previous_end_point)
-        #new_path.append(end_point)
+        new_path += new_points
+        new_path.append(end_point)
 
         # if DEBUG_MODE:
         # print("Punkty z pośrednimi: ")

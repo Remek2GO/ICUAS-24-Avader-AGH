@@ -26,6 +26,8 @@ IMAGES_FOLDER_PATH = "/root/sim_ws/src/icuas24_competition/images_eval"
 PROXIMITY_THRESHOLD = 0.2  # 0.1
 ROLL_IDX = 3
 ROLL_THRESHOLD = 6 * np.pi / 180
+PITCH_IDX = 4
+PITCH_THRESHOLD = 6 * np.pi / 180
 YAW_IDX = 5
 YAW_THRESHOLD = 3 * np.pi / 180
 
@@ -33,12 +35,11 @@ YAW_THRESHOLD = 3 * np.pi / 180
 class PhotoLogger:
     """Class to log all photos of the plants."""
 
-    def __init__(self, frequency: float, max_images: int, save_images: bool = True):
+    def __init__(self, frequency: float, save_images: bool = True):
         """Initialize the PhotoTaker class.
 
         Args:
             frequency (float): The frequency of the node.
-            max_images (int): The maximum number of images to take for each bed view.
             save_images (bool, optional): Whether to save the images or not. Defaults \
                 to `True`.
         """
@@ -48,7 +49,6 @@ class PhotoLogger:
         self.current_depth_msg: Image = None
         self.current_odom: Odometry = None
         self.rate = rospy.Rate(frequency)
-        self.max_images = max_images
         self.bed_view_poses: np.ndarray = None
         self.bed_view_encoding: Dict[int, Tuple[int, int]] = None
         self.bed_images: Dict[Tuple[int, int], int] = None
@@ -190,21 +190,24 @@ class PhotoLogger:
             # rospy.logdebug(f"[Photo Logger] Closest bed view: {bed_view}")
 
             # Check if we have already taken enough images of the current bed view
-            if self.bed_images[bed_view] >= self.max_images:
-                rospy.logdebug(
-                    f"[Photo Logger] {bed_view} Enough images taken: "
-                    f"{self.bed_images[bed_view]}/{self.max_images}"
-                )
-                continue
+            # if self.bed_images[bed_view] >= self.max_images:
+            #     rospy.logdebug(
+            #         f"[Photo Logger] {bed_view} Enough images taken: "
+            #         f"{self.bed_images[bed_view]}/{self.max_images}"
+            #     )
+            #     continue
 
             # Write images only if the UAV attitude meets the requirements
+            roll_diff = np.abs(odom_data[ROLL_IDX])
+            pitch_diff = np.abs(odom_data[PITCH_IDX])
             yaw_diff = self._get_yaw_error(
                 odom_data[YAW_IDX], self.bed_view_poses[closest_idx, YAW_IDX]
             )
             # rospy.logdebug(f"[Photo Logger] Roll: {odom_data[ROLL_IDX]} "
             #                f"Yaw diff: {yaw_diff}")
             if (
-                np.abs(odom_data[ROLL_IDX]) < ROLL_THRESHOLD
+                roll_diff < ROLL_THRESHOLD
+                and pitch_diff < PITCH_THRESHOLD
                 and yaw_diff < YAW_THRESHOLD
             ):
                 img_color = bridge.imgmsg_to_cv2(self.current_color_msg, "bgr8")
@@ -231,13 +234,14 @@ class PhotoLogger:
                         out_file.write(odom_txt)
 
                 self.bed_images[(bed_id, bed_side)] += 1
-                enaugh_data = self.bed_images[(bed_id, bed_side)] >= self.max_images
+                # enaugh_data = self.bed_images[(bed_id, bed_side)] >= self.max_images
+                enough_data = False
 
                 img_data_msg = BedImageData()
                 img_data_msg.bed_id = bed_id
                 img_data_msg.bed_side = bed_side
                 img_data_msg.img_seq = img_idx
-                img_data_msg.enaugh_data = enaugh_data
+                img_data_msg.enough_data = enough_data
                 img_data_msg.img_color = self.current_color_msg
                 img_data_msg.img_depth = self.current_depth_msg
                 img_data_msg.odom_data.x = odom_data[0]
@@ -246,11 +250,14 @@ class PhotoLogger:
                 img_data_msg.odom_data.roll = odom_data[3]
                 img_data_msg.odom_data.pitch = odom_data[4]
                 img_data_msg.odom_data.yaw = odom_data[5]
+                img_data_msg.roll_error = roll_diff
+                img_data_msg.pitch_error = pitch_diff
+                img_data_msg.yaw_error = yaw_diff
                 self.pub_bed_image_data.publish(img_data_msg)
 
                 rospy.logdebug(
-                    f"[Photo Logger] ({bed_id}, {bed_side}) Data saved: "
-                    f"{self.bed_images[(bed_id, bed_side)]}/{self.max_images}"
+                    f"[Photo Logger] ({bed_id}, {bed_side}) Number of images: "
+                    f"{self.bed_images[(bed_id, bed_side)]}"
                 )
         rospy.loginfo("[Photo Logger] Finished.")
 
@@ -261,7 +268,6 @@ if __name__ == "__main__":
         rospy.logerr("[Photo Logger] Usage: photo_logger.py <frequency> <max_images>")
         sys.exit(1)
     frequency = float(myargv[1])
-    max_images = int(myargv[2])
     is_debug = "--debug" in myargv
     log_level = rospy.DEBUG if is_debug else rospy.INFO
 
@@ -269,9 +275,8 @@ if __name__ == "__main__":
     rospy.loginfo(
         f"[Photo Logger] Node started with params:\n"
         f"\tFrequency: {frequency} Hz\n"
-        f"\tMax images: {max_images}\n"
         f"\tLog level: {log_level}"
     )
 
-    photo_logger = PhotoLogger(frequency, max_images, save_images=is_debug)
+    photo_logger = PhotoLogger(frequency, save_images=is_debug)
     photo_logger.run()

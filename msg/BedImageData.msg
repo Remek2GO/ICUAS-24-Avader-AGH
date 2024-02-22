@@ -4,8 +4,12 @@ uint8 bed_id                        # 1-27
 uint8 bed_side                      # 0-1 (0: left (closer to origin), 1: right)
 uint8 img_seq                       # Sequence number of the image
 
-bool enaugh_data                    # 0: not enough images for the (bed_id, bed_side), 1: enough images for the (bed_id, bed_side)
+bool enough_data                    # 0: not enough images for the (bed_id, bed_side), 1: enough images for the (bed_id, bed_side)
 
 sensor_msgs/Image img_color         # RGB image
 sensor_msgs/Image img_depth         # Depth image
 UavSetpoint odom_data               # Pose of the UAV when the image was taken
+
+float32 roll_error                  # UAV roll error when the image was taken
+float32 pitch_error                 # UAV pitch error when the image was taken
+float32 yaw_error                   # UAV yaw error when the image was taken

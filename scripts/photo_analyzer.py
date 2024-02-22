@@ -3,8 +3,9 @@
 
 import cv2
 import os
+import numpy as np
 import sys
-from typing import List, Dict
+from typing import Dict, List, Tuple
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
@@ -39,6 +40,11 @@ class PhotoAnalyzer:
         self.plant_beds: Dict[int, PlantBed] = {}
         self.fruit_type: PlantType = None
 
+        self.bed_view_errors: Dict[Tuple[int, int], float] = {}
+        self.roll_error_coefficient = 0.3
+        self.pitch_error_coefficient = 0.1
+        self.yaw_error_coefficient = 0.6
+
         self.eval_mode = eval_mode
 
         # ROS publishers and subscribers
@@ -56,6 +62,15 @@ class PhotoAnalyzer:
 
         rospy.Subscriber("/red/plants_beds", String, self._fruit_type_clb)
         rospy.Subscriber("/avader/bed_image_data", BedImageData, self._image_data_clb)
+
+    def _calculate_angle_error(
+        self, roll_error: float, pitch_error: float, yaw_error: float
+    ):
+        return (
+            self.roll_error_coefficient * roll_error
+            + self.pitch_error_coefficient * pitch_error
+            + self.yaw_error_coefficient * yaw_error
+        )
 
     def _fruit_type_clb(self, msg: String):
         fruit_name = msg.data.split(" ")[0]
@@ -84,11 +99,36 @@ class PhotoAnalyzer:
     def run(self):
         """Run the node."""
         while not rospy.is_shutdown():
+            # NOTE: The rate.sleep() is intentionally placed at the beginning of the
+            # loop to facilitate using the continue statement
+            self.rate.sleep()
+
+            # Check if there is any image data to process
             if len(self.bed_image_data_queue) > 0:
-                rospy.logdebug("[Photo Analyzer] Processing the image data")
+                rospy.logdebug(
+                    f"[Photo Analyzer] Processing the image data, "
+                    f"queue size: {len(self.bed_image_data_queue)}"
+                )
                 bed_image_data = self.bed_image_data_queue.pop(0)
-                # TODO: Add some condition to check if the image should be processed
-                # (e.g. based on the position of the UAV)
+
+                # Decide if the current image is better than the previous one(s)
+                bed_view = (bed_image_data.bed_id, bed_image_data.bed_side)
+                current_error = self._calculate_angle_error(
+                    bed_image_data.roll_error,
+                    bed_image_data.pitch_error,
+                    bed_image_data.yaw_error,
+                )
+                if bed_view not in self.bed_view_errors:
+                    self.bed_view_errors[bed_view] = current_error
+
+                if current_error > self.bed_view_errors[bed_view]:
+                    rospy.logdebug(
+                        f"[Photo Analyzer] Bed view error: {current_error} > "
+                        f"{self.bed_view_errors[bed_view]}"
+                    )
+                    continue
+
+                # Process the image
                 img_color = bridge.imgmsg_to_cv2(bed_image_data.img_color, "bgr8")
                 img_depth = bridge.imgmsg_to_cv2(bed_image_data.img_depth, "8UC1")
                 # TODO: Odom data as a string is a temporary solution to ensure the
@@ -170,6 +210,13 @@ class PhotoAnalyzer:
                 current_fruit_count = self.get_fruit_count()
                 self.pub_current_fruit_count.publish(current_fruit_count)
 
+                # Update lowest error
+                self.bed_view_errors[bed_view] = current_error
+                rospy.logdebug(
+                    f"[Photo Analyzer] Bed view error updated: "
+                    f"{self.bed_view_errors[bed_view]}"
+                )
+
                 # NOTE: Evaluation only
                 if self.eval_mode:
                     # Publish the result
@@ -191,8 +238,6 @@ class PhotoAnalyzer:
             # Publish the result image
             if self.result_image is not None:
                 self.pub_output_image.publish(self.result_image)
-
-            self.rate.sleep()
 
 
 if __name__ == "__main__":

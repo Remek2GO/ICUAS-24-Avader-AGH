@@ -2,13 +2,12 @@
 <launch>
     <arg name="frequency" default="20.0" />
     <arg name="fps" default="30.0" />
-    <arg name="max_images" default="10" />
     <arg name="verbosity_level" default="" />
     <arg name="eval" default="" />
 
     <!-- <node name="photo_taker" pkg="icuas24_competition" type="photo_taker.py" output="screen"/>  -->
     <!-- <node name="image_analyzer" pkg="icuas24_competition" type="image_analyzer.py" output="screen" /> -->
-    <node name="photo_logger" pkg="icuas24_competition" type="photo_logger.py" args="$(arg fps) $(arg max_images) --debug" output="screen"/>
+    <node name="photo_logger" pkg="icuas24_competition" type="photo_logger.py" args="$(arg fps) --debug" output="screen"/>
     <node name="photo_analyzer" pkg="icuas24_competition" type="photo_analyzer.py" args="$(arg fps) $(arg eval) --debug" output="screen"/>
     <node name="path_setter" pkg="icuas24_competition" type="path_setter.py" args="$(arg frequency)" output="screen"/>
 </launch>
