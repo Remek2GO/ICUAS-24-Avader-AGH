@@ -9,7 +9,7 @@ sys.path.append(BASE_DIR)
 import csv
 import numpy as np
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, NewType, Tuple
 
 import rospy
 
@@ -21,6 +21,8 @@ from tf.transformations import quaternion_matrix
 
 from icuas24_competition.msg import AnalyzerResult
 from scripts.utils.types import PlantBedsIds, PlantType
+
+Boundaries = NewType("Boundaries", List[Tuple[float, float]])
 
 ARENA_CUBE = np.array(
     [
@@ -35,6 +37,18 @@ ARENA_CUBE = np.array(
         [20.0, 0.0, 0.0],
     ]
 )
+# Tuples with the minimum and maximum values for the arena boundaries
+# in the x, y, z axes
+ARENA_BOUNDARIES: Boundaries = [(0.0, 20.0), (0.0, 27.0), (0.0, 9.0)]
+
+# Tuples with the minimum and maximum values for the plant bed boundaries
+# in the x, y, z axes
+BED_BOUNDARIES: List[Boundaries] = [
+    [(2.95, 5.05), (2.95, 24.05), (0.0, 9.0)],
+    [(8.95, 11.05), (2.95, 24.05), (0.0, 9.0)],
+    [(14.95, 17.05), (2.95, 24.05), (0.0, 9.0)],
+]
+
 BED_CUBES = [
     np.array(
         [
@@ -77,8 +91,12 @@ BED_CUBES = [
     ),
 ]
 # BRIDGE = CvBridge()
+
+# End (destination) position for the UAV
 END_POSITION = np.array([1.0, 1.0])
 # IMAGES_FOLDER_PATH = "/root/sim_ws/src/icuas24_competition/images"
+
+# Boundary vectors for the UAV in the shape [8, 3] - vertices of the cube
 UAV_BOUNDARY_VECTORS = np.array(
     [
         # [x, y, z]
@@ -243,6 +261,7 @@ class Evaluator:
         return -25 * self.collision_cnt
 
     def _calculate_fruit_points(self, count_val: int) -> float:
+
         return 50 * (1 - 4 * abs(count_val - self.fruit_count_gt) / self.fruit_count_gt)
 
     def _calculate_path_points(self, distance_val: float) -> float:
@@ -281,7 +300,6 @@ class Evaluator:
         for bed_id in self.beds_gt:
             if not all(self.beds_counted[bed_id]):
                 rospy.logerr(f"[Evaluator] Bed {bed_id} not fully counted.")
-
         # Check if the UAV found the proper number of fruits
         if msg.data == self.fruit_count_gt:
             rospy.loginfo(
@@ -293,12 +311,44 @@ class Evaluator:
                 f"[GT: {self.fruit_count_gt}].\033[0m"
             )
 
+    def _inside_test(self, points: np.ndarray, bounds: Boundaries) -> int:
+        """Check if the points are inside the given boundaries.
+
+        Args:
+            points (np.ndarray): Points to check in the shape [N, 3]
+            bounds (Boundaries): Boundaries for the x, y, z axes
+
+        Returns:
+            int: Number of points inside the boundaries
+        """
+        # Get boundaries for the x, y, z axes
+        xmin, xmax = bounds[0]
+        ymin, ymax = bounds[1]
+        zmin, zmax = bounds[2]
+
+        # Check if the points are inside the boundaries
+        points_inside = []
+        for i in range(len(points)):
+            if (
+                xmin < points[i, 0] < xmax
+                and ymin < points[i, 1] < ymax
+                and zmin < points[i, 2] < zmax
+            ):
+                points_inside.append(i)
+
+        return len(points_inside)
+
     def _model_states_clb(self, msg: ModelStates):
         # Get the pose of the UAV
         try:
             red_idx = msg.name.index("red")
         except ValueError:
             return
+
+        # No measurements before start
+        if not (self.challenge_started_received and self.plants_beds_received):
+            return
+
         red_pose: Pose = msg.pose[red_idx]
         red_position = np.array(
             [red_pose.position.x, red_pose.position.y, red_pose.position.z]
@@ -317,43 +367,37 @@ class Evaluator:
         ).getT()
 
         # Check arena boundaries
-        if (
-            not self.uav_in_collision
-            and len(self._outside_test(boundary_points, ARENA_CUBE)) > 0
-        ):
+        if not self.uav_in_collision and self._inside_test(
+            boundary_points, ARENA_BOUNDARIES
+        ) < len(UAV_BOUNDARY_VECTORS):
             self.uav_in_collision = True
             self.collision_cnt += 1
             rospy.loginfo("\033[31m[Evaluator] UAV left the arena.\033[0m")
-        elif (
-            self.uav_in_collision
-            and len(self._outside_test(boundary_points, ARENA_CUBE)) == 0
-        ):
+        elif self.uav_in_collision and self._inside_test(
+            boundary_points, ARENA_BOUNDARIES
+        ) == len(UAV_BOUNDARY_VECTORS):
             self.uav_in_collision = False
             rospy.loginfo("[Evaluator] UAV re-entered the arena.")
 
         # Check plant beds boundaries
-        # for i, cube in enumerate(BED_CUBES):
-        #     rospy.loginfo(
-        #         f"[Evaluator] Checking plant bed {cube}: "
-        #         f"{self._outside_test(boundary_points, cube)}."
-        #     )
-            # if self.collision_bed_id == -1 and len(
-            #     self._outside_test(boundary_points, cube)
-            # ) < len(UAV_BOUNDARY_VECTORS):
-            #     self.collision_bed_id = i
-            #     self.collision_cnt += 1
-            #     rospy.loginfo(
-            #         f"\033[31m[Evaluator] UAV collided with plant bed {i}.\033[0m"
-            #     )
-            #     break
-            # elif (
-            #     self.collision_bed_id == i
-            #     and len(self._outside_test(boundary_points, cube))
-            #     == len(UAV_BOUNDARY_VECTORS)
-            # ):
-            #     self.uav_in_collision = False
-            #     self.collision_bed_id = -1
-            #     rospy.loginfo(f"[Evaluator] UAV left plant bed {i}.")
+        for i, bounds in enumerate(BED_BOUNDARIES):
+            if (
+                self.collision_bed_id == -1
+                and self._inside_test(boundary_points, bounds) > 0
+            ):
+                self.collision_bed_id = i
+                self.collision_cnt += 1
+                rospy.loginfo(
+                    f"\033[31m[Evaluator] UAV collided with plant bed {i}.\033[0m"
+                )
+                break
+            elif (
+                self.collision_bed_id == i
+                and self._inside_test(boundary_points, bounds) == 0
+            ):
+                self.uav_in_collision = False
+                self.collision_bed_id = -1
+                rospy.loginfo(f"[Evaluator] UAV left plant bed {i}.")
 
         # Distance + position check
         if self.red_prev_position is not None:
@@ -368,6 +412,10 @@ class Evaluator:
             ):
                 rospy.loginfo("[Evaluator] End position reached.")
                 self.final_points += self._calculate_collision_points()
+                rospy.loginfo(
+                    f"[Evaluator] Collision and fly-off counts: "
+                    f"{self.collision_cnt}."
+                )
                 self.final_points += self._calculate_path_points(self.red_distance)
                 rospy.loginfo(f"[Evaluator] Distance: {self.red_distance:.2f}.")
                 if self.start_time is not None:
@@ -384,42 +432,6 @@ class Evaluator:
         else:
             self.red_distance = 0.0
         self.red_prev_position = red_position
-
-    def _outside_test(self, points: np.ndarray, cube3d: np.ndarray) -> List[int]:
-        """Check if the points are outside or in the boundary of the 3D cube.
-
-        Args:
-            points (np.ndarray): Points to check as numpy array with shape (N, 3).
-            cube3d (np.ndarray): 3D cube as numpy array with shape (8, 3) with the \
-                coordinates in the clockwise order. The first 4 points are the bottom \
-                and the last 4 points are the top.
-
-        Returns:
-            List[int]: List of indices of the points that are outside the cube.
-        """
-        b1, b2, _, b4, t1, _, t3, _ = cube3d
-
-        dir1 = t1 - b1
-        size1 = np.linalg.norm(dir1)
-        dir1 = dir1 / size1
-
-        dir2 = b2 - b1
-        size2 = np.linalg.norm(dir2)
-        dir2 = dir2 / size2
-
-        dir3 = b4 - b1
-        size3 = np.linalg.norm(dir3)
-        dir3 = dir3 / size3
-
-        cube3d_center = (b1 + t3) / 2.0
-
-        dir_vec = points - cube3d_center
-
-        res1 = np.where((np.absolute(np.dot(dir_vec, dir1)) * 2) >= size1)[0]
-        res2 = np.where((np.absolute(np.dot(dir_vec, dir2)) * 2) >= size2)[0]
-        res3 = np.where((np.absolute(np.dot(dir_vec, dir3)) * 2) >= size3)[0]
-
-        return list(set().union(res1, res2, res3))
 
     def _plants_beds_clb(self, msg: String):
         self.plants_beds_received = True

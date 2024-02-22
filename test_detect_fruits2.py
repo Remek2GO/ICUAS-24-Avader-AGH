@@ -9,6 +9,7 @@ from scripts.utils.plant_bed import PlantBed, PlantSideCount
 from typing import NewType
 from icuas24_competition.msg import BedImageData, BedView, BedViewArray
 from scripts.utils.positions import POINTS_OF_INTEREST, PointOfInterest
+from scripts import photo_logger
 
 from scripts.evaluator import Plant as ev_Plant, PlantBed as ev_PlantBed
 
@@ -149,6 +150,7 @@ if __name__ == "__main__":
     
     bed_view_poses = np.array(bed_view_poses_list)
 
+    best_all_bed = []
     for bed_id in bed_ids:
         for bed_side in bed_sides:
             unique_id = f"{bed_id}{bed_side}_"
@@ -341,6 +343,33 @@ if __name__ == "__main__":
             fruit_right = plant_beds[bed_id].get_bed_fruit_count_right(fruit_type)
             fruit_left = plant_beds[bed_id].get_bed_fruit_count_left(fruit_type)
 
+        
+        # Gather the data
+        plant_beds[bed_id].set_plant(
+            idx,
+            bed_side,
+            plant_side.fruit_count,
+            plant_side.fruit_position.copy(),
+            plant_side.fruit_type,
+        )
+
+    cv2.imshow(f"Image rotated_{bed_id}_{i}", img_rotated)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+    print(f"Bed {bed_id}")
+    for fruit_type in [PlantType.TOMATO, PlantType.EGGPLANT, PlantType.PEPPER]:
+        fruit_sum = plant_beds[bed_id].get_bed_fruit_count(fruit_type)
+        fruit_right = plant_beds[bed_id].get_bed_fruit_count_right(fruit_type)
+        fruit_left = plant_beds[bed_id].get_bed_fruit_count_left(fruit_type)
+
+        print(f"Fruit type: {fruit_type}")
+        print(f"Total fruit count: {fruit_sum}")
+        print(f"Right fruit count: {fruit_right}")
+        print(f"Left fruit count: {fruit_left}")
+
+
+        if csv_plant_beds[bed_id - 1].left.plant_type == fruit_type:
             print(f"Fruit type: {fruit_type}")
             print(f"VIS right fruit count: {fruit_right}")
             print(f"VIS left fruit count: {fruit_left}")
@@ -365,6 +394,8 @@ if __name__ == "__main__":
                     print(f"All fruit count does not match")
                     error = True
 
+            if csv_plant_beds[bed_id - 1].left.all_fruits != fruit_sum:
+                print(f"All fruit count does not match")
 
             if csv_plant_beds[bed_id - 1].centre.plant_type == fruit_type:
                 print(f"Fruit type: {fruit_type}")
@@ -408,7 +439,6 @@ if __name__ == "__main__":
             cv2.waitKey(0)
             cv2.destroyAllWindows()
 
-        
 
 
-    current_fruit_count = get_fruit_count(plant_beds)
+current_fruit_count = get_fruit_count(plant_beds)
