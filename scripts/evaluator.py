@@ -261,6 +261,7 @@ class Evaluator:
         return -25 * self.collision_cnt
 
     def _calculate_fruit_points(self, count_val: int) -> float:
+
         return 50 * (1 - 4 * abs(count_val - self.fruit_count_gt) / self.fruit_count_gt)
 
     def _calculate_path_points(self, distance_val: float) -> float:
@@ -406,6 +407,10 @@ class Evaluator:
             ):
                 rospy.loginfo("[Evaluator] End position reached.")
                 self.final_points += self._calculate_collision_points()
+                rospy.loginfo(
+                    f"[Evaluator] Collision and fly-off counts: "
+                    f"{self.collision_cnt}."
+                )
                 self.final_points += self._calculate_path_points(self.red_distance)
                 rospy.loginfo(f"[Evaluator] Distance: {self.red_distance:.2f}.")
                 if self.start_time is not None:
