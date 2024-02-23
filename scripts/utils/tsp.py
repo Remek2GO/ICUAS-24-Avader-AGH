@@ -226,11 +226,30 @@ def prepare_points(points_from_drone):
 
 
 def get_photo_poses(points_indexes):
-    """Change"""
+    """Change 1-D indexes to setpoints [x, y, z, roll, pitch, yaw]
+
+    Args:
+        points_indexes (List[int]): List of 1-D indexes
+
+    Returns:
+        List[PointOfInterest]: List of setpoints [x, y, z, roll, pitch, yaw]"""
     setpoints = []
     for idx in points_indexes:
         setpoints.append(POINTS_OF_INTEREST[idx // 2][idx % 2])
     return setpoints[1:]
+
+
+def make_tour_start_from_0(tour: List[int]):
+    """Rotate the tour so that it starts from 0
+
+    Args:
+        tour (List[int]): List of tour indexes
+
+    Returns:
+        List[int]: List of tour indexes"""
+
+    idx = tour.index(0)
+    return tour[idx:] + tour[:idx]
 
 
 def start(AREAS_FROM_DRONE):
@@ -244,6 +263,7 @@ def start(AREAS_FROM_DRONE):
     distance_matrix_int = (distance_matrix * 100.0).astype(int)
     tsp = TSP(distance_matrix_int)
     tour = tsp.solve()
+    tour = make_tour_start_from_0(tour)
     print(f"Tour: {tour}")
 
     # Change tour indeces to 1-D points indeces
@@ -264,7 +284,7 @@ def start(AREAS_FROM_DRONE):
 
 
 if __name__ == "__main__":
-    AREAS_FROM_DRONE = [13, 15, 17, 19, 25]
+    AREAS_FROM_DRONE = list(range(1, 28))
     setpoints, photo_poses = start(AREAS_FROM_DRONE)
 
     print(photo_poses)
