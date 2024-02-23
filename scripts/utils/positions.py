@@ -2,7 +2,7 @@
 
 import numpy as np
 import sys
-from typing import NewType, Tuple
+from typing import NewType, Tuple, List
 
 np.set_printoptions(threshold=sys.maxsize)
 
@@ -12,7 +12,7 @@ PointOfInterest = NewType(
 POINTS_OF_INTEREST = {
     # [x, y, z, roll, pitch, yaw]
     # first row is point with smaller x, second row is point on the other side
-    0: [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]],
+    0: [[1, 1, 1, 0, 0, 0], [1, 1, 2, 0, 0, 0]],
     1: [[1, 6, 1.8, 0, 0, 0], [7, 6, 1.8, 0, 0, np.pi]],
     2: [[1, 6, 4.6, 0, 0, 0], [7, 6, 4.6, 0, 0, np.pi]],
     3: [[1, 6, 7.4, 0, 0, 0], [7, 6, 7.4, 0, 0, np.pi]],
@@ -95,5 +95,52 @@ def matrix_of_distances() -> np.ndarray:
         for j in range(n):
             distances[i, j] = get_distance(
                 (np.floor(i / 2), i % 2), (np.floor(j / 2), j % 2)
+            )
+    return distances
+
+
+def create_distance_matrix(
+    points_general_indeces: List[int], add_start_point: bool = True
+) -> np.ndarray:
+    """Create a matrix of distances between selected points of interest.
+
+    Args:
+        points_general_indeces (List[int]): The indeces of the points of interest. Indeces
+            are bed_id * 2 + side_id (0 or 1).
+
+    Returns:
+        np.ndarray: The matrix of distances.
+    """
+    n = len(points_general_indeces)
+    distances = np.zeros((n, n))
+    for i in range(n):
+        for j in range(n):
+            distances[i, j] = get_distance(
+                (
+                    np.floor(points_general_indeces[i] / 2),
+                    points_general_indeces[i] % 2,
+                ),
+                (
+                    np.floor(points_general_indeces[j] / 2),
+                    points_general_indeces[j] % 2,
+                ),
+            )
+    if add_start_point:
+        distances = np.insert(distances, 0, 0, axis=0)
+        distances = np.insert(distances, 0, 0, axis=1)
+        for i in range(1, n + 1):
+            distances[0, i] = get_distance(
+                (0, 0),
+                (
+                    np.floor(points_general_indeces[i - 1] / 2),
+                    points_general_indeces[i - 1] % 2,
+                ),
+            )
+            distances[i, 0] = get_distance(
+                (0, 1),
+                (
+                    np.floor(points_general_indeces[i - 1] / 2),
+                    points_general_indeces[i - 1] % 2,
+                ),
             )
     return distances
