@@ -489,6 +489,7 @@ class Evaluator:
                             {
                                 "beds_to_visit": self.plant_beds_ids.bed_ids,
                                 "beds_not_counted": not_counted_beds,
+                                "fruit_type": str(self.plant_beds_ids.plant_type),
                                 "fruit_count_gt": self.fruit_count_gt,
                                 "fruit_count_result": self.fruit_count_result,
                                 "fruit_points": fruit_points,
