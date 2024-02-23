@@ -51,7 +51,5 @@ windows:
       layout: tiled
       panes:
         - |
-          rm /root/sim_ws/src/icuas24_competition/images/*.png 
           waitForRos 
           rosrun icuas24_competition evaluator.py /root/sim_ws/src/icuas24_competition/beds.csv
-        - waitForRos; rosrun rqt_gui rqt_gui
