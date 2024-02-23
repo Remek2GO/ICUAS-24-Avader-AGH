@@ -36,6 +36,7 @@ def main(n_cases: int):
         # Generate unique output files id
         output_id = str(uuid.uuid4()).replace("-", "")
         output_file = f"{output_id}.json"
+        print(f"Output file: {output_file}")
 
         # Create session file
         output_lines = []
