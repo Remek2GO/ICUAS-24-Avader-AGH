@@ -7,6 +7,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
 import csv
+import json
 import numpy as np
 from dataclasses import dataclass
 from typing import Dict, List, NewType, Tuple
@@ -24,19 +25,6 @@ from scripts.utils.types import PlantBedsIds, PlantType
 
 Boundaries = NewType("Boundaries", List[Tuple[float, float]])
 
-ARENA_CUBE = np.array(
-    [
-        # [x, y, z]
-        [0.0, 0.0, 0.0],
-        [0.0, 27.0, 0.0],
-        [20.0, 27.0, 0.0],
-        [20.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0],
-        [0.0, 27.0, 0.0],
-        [20.0, 27.0, 0.0],
-        [20.0, 0.0, 0.0],
-    ]
-)
 # Tuples with the minimum and maximum values for the arena boundaries
 # in the x, y, z axes
 ARENA_BOUNDARIES: Boundaries = [(0.0, 20.0), (0.0, 27.0), (0.0, 9.0)]
@@ -49,51 +37,11 @@ BED_BOUNDARIES: List[Boundaries] = [
     [(14.95, 17.05), (2.95, 24.05), (0.0, 9.0)],
 ]
 
-BED_CUBES = [
-    np.array(
-        [
-            # [x, y, z]
-            [2.95, 2.95, 0.0],
-            [2.95, 24.05, 0.0],
-            [5.05, 24.05, 0.0],
-            [5.05, 2.95, 0.0],
-            [2.95, 2.95, 9.0],
-            [2.95, 24.05, 9.0],
-            [5.05, 24.05, 9.0],
-            [5.05, 2.95, 9.0],
-        ]
-    ),
-    np.array(
-        [
-            # [x, y, z]
-            [8.95, 2.95, 0.0],
-            [8.95, 24.05, 0.0],
-            [11.05, 24.05, 0.0],
-            [11.05, 2.95, 0.0],
-            [8.95, 2.95, 9.0],
-            [8.95, 24.05, 9.0],
-            [11.05, 24.05, 9.0],
-            [11.05, 2.95, 9.0],
-        ]
-    ),
-    np.array(
-        [
-            # [x, y, z]
-            [14.95, 2.95, 0.0],
-            [14.95, 24.05, 0.0],
-            [17.05, 24.05, 0.0],
-            [17.05, 2.95, 0.0],
-            [14.95, 2.95, 9.0],
-            [14.95, 24.05, 9.0],
-            [17.05, 24.05, 9.0],
-            [17.05, 2.95, 9.0],
-        ]
-    ),
-]
 # BRIDGE = CvBridge()
 
 # End (destination) position for the UAV
 END_POSITION = np.array([1.0, 1.0])
+
 # IMAGES_FOLDER_PATH = "/root/sim_ws/src/icuas24_competition/images"
 
 # Boundary vectors for the UAV in the shape [8, 3] - vertices of the cube
@@ -152,7 +100,7 @@ class PlantBed:
 class Evaluator:
     """Class to evaluate the model on the test track."""
 
-    def __init__(self, path_to_beds_csv: str):
+    def __init__(self, path_to_beds_csv: str, path_to_output_json: str):
         """Initialize the evaluator.
 
         Args:
@@ -161,18 +109,22 @@ class Evaluator:
         self.challenge_started_received: bool = False
         self.plants_beds_received: bool = False
         self.fruit_count_received: bool = False
+        self.end_position_reached: bool = False
         self.start_time: float = None
+        self.end_time: float = None
         self.plant_beds_ids: PlantBedsIds = None
         self.beds_gt: Dict[int, Plant] = {}
-        self.fruit_count_gt: int = None
         self.beds_results: Dict[int, Plant] = {}
         self.beds_counted: Dict[int, List[bool]] = {}
+        self.fruit_count_gt: int = None
+        self.fruit_count_result: int = None
         self.red_prev_position: np.ndarray = None
         self.red_distance: float = 0.0
         self.final_points: float = 0.0
         self.uav_in_collision: bool = False
         self.collision_bed_id: int = -1
         self.collision_cnt: int = 0
+        self.path_to_output_json: str = path_to_output_json
 
         # Load the plant beds from the CSV file to the dictionary
         # NOTE: We add a dummy bed at the beginning to match the bed_id
@@ -281,35 +233,9 @@ class Evaluator:
             rospy.loginfo("[Evaluator] Time start.")
 
     def _fruit_count_clb(self, msg: Int32):
+        # Save fruit count result
+        self.fruit_count_result = msg.data
         self.fruit_count_received = True
-        self.final_points += self._calculate_fruit_points(msg.data)
-
-        # Print fruit count summary
-        for bed_id in self.beds_results:
-            gt = self.beds_gt[bed_id].all_fruits
-            count = self.beds_results[bed_id].all_fruits
-            if count == gt:
-                rospy.loginfo(
-                    f"\033[32m[Evaluator] ({bed_id}): Correct final sum {gt}.\033[0m"
-                )
-            else:
-                rospy.loginfo(
-                    f"\033[31m[Evaluator] ({bed_id}): Incorrect final sum {count} "
-                    f"[GT: {gt}].\033[0m"
-                )
-        for bed_id in self.beds_gt:
-            if not all(self.beds_counted[bed_id]):
-                rospy.logerr(f"[Evaluator] Bed {bed_id} not fully counted.")
-        # Check if the UAV found the proper number of fruits
-        if msg.data == self.fruit_count_gt:
-            rospy.loginfo(
-                f"\033[32m[Evaluator] Correct fruit count: {msg.data}.\033[0m"
-            )
-        else:
-            rospy.loginfo(
-                f"\033[31m[Evaluator] Incorrect fruit count: {msg.data} "
-                f"[GT: {self.fruit_count_gt}].\033[0m"
-            )
 
     def _inside_test(self, points: np.ndarray, bounds: Boundaries) -> int:
         """Check if the points are inside the given boundaries.
@@ -339,6 +265,10 @@ class Evaluator:
         return len(points_inside)
 
     def _model_states_clb(self, msg: ModelStates):
+        # No measurements after end
+        if self.end_position_reached:
+            return
+
         # Get the pose of the UAV
         try:
             red_idx = msg.name.index("red")
@@ -411,24 +341,7 @@ class Evaluator:
                 and self.fruit_count_received
             ):
                 rospy.loginfo("[Evaluator] End position reached.")
-                self.final_points += self._calculate_collision_points()
-                rospy.loginfo(
-                    f"[Evaluator] Collision and fly-off counts: "
-                    f"{self.collision_cnt}."
-                )
-                self.final_points += self._calculate_path_points(self.red_distance)
-                rospy.loginfo(f"[Evaluator] Distance: {self.red_distance:.2f}.")
-                if self.start_time is not None:
-                    final_time = rospy.get_time() - self.start_time
-                    self.final_points += self._calculate_time_points(final_time)
-                    rospy.loginfo(f"[Evaluator] Time: {final_time:.2f}.")
-                else:
-                    rospy.logwarn("[Evaluator] Time start not received.")
-                rospy.loginfo(
-                    f"\033[1;33m[Evaluator] Final points: "
-                    f"{self.final_points:.1f}.\033[0m"
-                )
-                rospy.signal_shutdown("End position reached.")
+                self.end_position_reached = True
         else:
             self.red_distance = 0.0
         self.red_prev_position = red_position
@@ -487,6 +400,109 @@ class Evaluator:
             f"[Evaluator] Ground truth for fruit count: {self.fruit_count_gt}."
         )
 
+    def run(self):
+        """Run the evaluator."""
+        wait_rate = rospy.Rate(5)
+        while not rospy.is_shutdown():
+            if self.end_position_reached and self.fruit_count_received:
+                self.end_time = rospy.get_time()
+
+                # Log beds not counted
+                not_counted_beds = []
+                for bed_id in self.beds_gt:
+                    if not all(self.beds_counted[bed_id]):
+                        not_counted_beds.append(bed_id)
+                        rospy.loginfo(
+                            f"\033[31m[Evaluator] Bed {bed_id} not fully "
+                            f"counted.\033[m"
+                        )
+
+                # Log fruit count summary
+                for bed_id in self.beds_results:
+                    gt = self.beds_gt[bed_id].all_fruits
+                    count = self.beds_results[bed_id].all_fruits
+                    if count == gt:
+                        rospy.loginfo(
+                            f"\033[32m[Evaluator] ({bed_id}): Correct final sum "
+                            f"{gt}.\033[0m"
+                        )
+                    else:
+                        rospy.loginfo(
+                            f"\033[31m[Evaluator] ({bed_id}): Incorrect final sum "
+                            f"{count} [GT: {gt}].\033[0m"
+                        )
+
+                # Log fruit points
+                fruit_points = self._calculate_fruit_points(self.fruit_count_result)
+                self.final_points += fruit_points
+
+                if self.fruit_count_result == self.fruit_count_gt:
+                    rospy.loginfo(
+                        f"\033[32m[Evaluator] Correct fruit count: "
+                        f"{self.fruit_count_result}: {fruit_points:.2f} points\033[0m"
+                    )
+                else:
+                    rospy.loginfo(
+                        f"\033[31m[Evaluator] Incorrect fruit count: "
+                        f"{self.fruit_count_result}: {fruit_points:.2f} points "
+                        f"[GT: {self.fruit_count_gt}]\033[0m"
+                    )
+
+                # Log collision and fly-off points
+                collision_points = self._calculate_collision_points()
+                self.final_points += collision_points
+                rospy.loginfo(
+                    f"[Evaluator] Collision and fly-off counts "
+                    f"{self.collision_cnt}: {collision_points:.2f} points"
+                )
+
+                # Log distance points
+                distance_points = self._calculate_path_points(self.red_distance)
+                self.final_points += distance_points
+                rospy.loginfo(
+                    f"[Evaluator] Distance {self.red_distance:.2f}: "
+                    f"{distance_points:.2f} points"
+                )
+
+                # Log time points
+                time_delta = self.end_time - self.start_time
+                time_points = self._calculate_time_points(time_delta)
+                self.final_points += time_points
+                rospy.loginfo(
+                    f"[Evaluator] Time delta {time_delta:.4f}: {time_points:.2f} points"
+                )
+
+                # Log final points
+                rospy.loginfo(
+                    f"\033[1;33m[Evaluator] Total points: {self.final_points:.2f}."
+                    f"\033[0m"
+                )
+
+                # Save the results to the JSON file
+                if self.path_to_output_json:
+                    with open(self.path_to_output_json, "w") as f:
+                        json.dump(
+                            {
+                                "beds_to_visit": self.plant_beds_ids.bed_ids,
+                                "beds_not_counted": not_counted_beds,
+                                "fruit_count_gt": self.fruit_count_gt,
+                                "fruit_count_result": self.fruit_count_result,
+                                "fruit_points": fruit_points,
+                                "collision_cnt": self.collision_cnt,
+                                "collision_points": collision_points,
+                                "distance": self.red_distance,
+                                "distance_points": distance_points,
+                                "time_delta": time_delta,
+                                "time_points": time_points,
+                                "final_points": self.final_points,
+                            },
+                            f,
+                        )
+
+                # Shutdown the node
+                return
+            wait_rate.sleep()
+
 
 if __name__ == "__main__":
     myargv = rospy.myargv(argv=sys.argv)
@@ -495,6 +511,17 @@ if __name__ == "__main__":
         sys.exit(1)
     beds_csv_path = myargv[1]
 
+    output_json_path = None
+    if len(myargv) > 2:
+        output_json_path = myargv[2]
+    else:
+        rospy.logwarn(
+            "[Evaluator] No output JSON file path provided. "
+            "The results will not be saved."
+        )
+
     rospy.init_node("evaluator")
-    Evaluator(beds_csv_path)
-    rospy.spin()
+    evaluator = Evaluator(beds_csv_path, output_json_path)
+    evaluator.run()
+
+    rospy.loginfo("[Evaluator] Shutting down.")

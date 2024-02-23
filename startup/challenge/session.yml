@@ -52,4 +52,4 @@ windows:
       panes:
         - |
           waitForRos 
-          rosrun icuas24_competition evaluator.py /root/sim_ws/src/icuas24_competition/beds.csv
+          rosrun icuas24_competition evaluator.py /root/sim_ws/src/icuas24_competition/beds.csv /root/sim_ws/src/icuas24_competition/eval_result.json
