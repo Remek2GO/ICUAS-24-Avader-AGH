@@ -213,8 +213,12 @@ class Evaluator:
         return -25 * self.collision_cnt
 
     def _calculate_fruit_points(self, count_val: int) -> float:
-
-        return 50 * (1 - 4 * abs(count_val - self.fruit_count_gt) / self.fruit_count_gt)
+        denominator = (
+            self.fruit_count_gt
+            if self.fruit_count_gt > 0
+            else 2 * len(self.plant_beds_ids.bed_ids)
+        )
+        return 50 * (1 - 4 * abs(count_val - self.fruit_count_gt) / denominator)
 
     def _calculate_path_points(self, distance_val: float) -> float:
         path_base = 150
