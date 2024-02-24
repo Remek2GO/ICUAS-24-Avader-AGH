@@ -164,6 +164,7 @@ class PhotoLogger:
                 self.bed_view_poses[:, :3] - odom_data[:3], axis=1
             )
             # rospy.logdebug(f"[Photo Logger] Distances: {distances}")
+            # rospy.logdebug(f"[Photo Logger] Min distance: {np.min(distances)}")
 
             # Get the indices of the closest bed views
             closest_idx = np.argwhere(distances < PROXIMITY_THRESHOLD)

@@ -46,7 +46,7 @@ windows:
           waitForRos
           rm /root/sim_ws/src/icuas24_competition/images_eval/*.png
           rm /root/sim_ws/src/icuas24_competition/images_eval/*.txt
-          roslaunch icuas24_competition challenge.launch max_images:=15 eval:=--eval
+          roslaunch icuas24_competition challenge.launch eval:=--eval
   - evaluation:
       layout: tiled
       panes:

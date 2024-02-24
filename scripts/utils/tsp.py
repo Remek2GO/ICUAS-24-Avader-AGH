@@ -16,11 +16,11 @@ from .positions import (
 )
 from typing import List
 
-NUM_CHEBYSHEV_BETWEEN_BEDS = 15
-NUM_TIMES_REPEAT_POINT = 5
-NUM_CHEBYSHEV_CHANGE_BEDS = 5
-NUM_CHEBYSHEV_ALONG_BEDS_TO_START = 10
-NUM_CHEBYSHEV_BACK_TO_START = 10
+NUM_CHEBYSHEV_BETWEEN_BEDS = 3
+NUM_TIMES_REPEAT_POINT = 0
+NUM_CHEBYSHEV_CHANGE_BEDS = 3
+NUM_CHEBYSHEV_ALONG_BEDS_TO_START = 3
+NUM_CHEBYSHEV_BACK_TO_START = 3
 
 START_POINT = [1, 1, 1, 0, 0, 0]
 END_POINT = [1, 1, 2, 0, 0, 0]
@@ -255,7 +255,7 @@ def make_tour_start_from_0(tour: List[int]):
 def start(AREAS_FROM_DRONE):
     # Change 2-D indexes to 1-D indexes
     points_indexes = prepare_points(AREAS_FROM_DRONE)
-    print(f"Points indexes: {points_indexes}")
+    # print(f"Points indexes: {points_indexes}")
 
     distance_matrix = create_distance_matrix(points_indexes)
 
@@ -264,21 +264,21 @@ def start(AREAS_FROM_DRONE):
     tsp = TSP(distance_matrix_int)
     tour = tsp.solve()
     tour = make_tour_start_from_0(tour)
-    print(f"Tour: {tour}")
+    # print(f"Tour: {tour}")
 
     # Change tour indeces to 1-D points indeces
     points_indexes = [0, *points_indexes]
     sorted_points = [points_indexes[i] for i in tour]
-    print(f"Sorted points: {sorted_points}")
+    # print(f"Sorted points: {sorted_points}")
 
     # Change 1-D indexes to setpoints [x, y, z, roll, pitch, yaw]
     target_points = get_photo_poses(sorted_points)
-    print(f"Target points: {target_points}")
+    # print(f"Target points: {target_points}")
 
     setpoints = intermediate_points(target_points)
 
     length = fast_tsp.compute_cost(tour, distance_matrix_int)
-    print(f"Tour length: {length/100.0}")
+    # print(f"Tour length: {length/100.0}")
 
     return setpoints, [points_indexes[i] for i in tour]
 
@@ -287,4 +287,5 @@ if __name__ == "__main__":
     AREAS_FROM_DRONE = list(range(1, 28))
     setpoints, photo_poses = start(AREAS_FROM_DRONE)
 
-    print(photo_poses)
+    # print(photo_poses)
+    # print(setpoints)

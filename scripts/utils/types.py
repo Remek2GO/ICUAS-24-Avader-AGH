@@ -55,8 +55,9 @@ class PathStatus(Enum):
 
     REACHED = 0
     PROGRESS = 1
-    COMPLETED = 2
-    WAITING = 3
+    PROGRESS_TO_PHOTO = 2
+    COMPLETED = 3
+    WAITING = 4
 
 
 @dataclass

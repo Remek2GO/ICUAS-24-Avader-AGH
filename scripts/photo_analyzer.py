@@ -255,7 +255,10 @@ if __name__ == "__main__":
     eval_mode = "--eval" in myargs
 
     rospy.init_node("photo_analyzer", log_level=log_level)
-    rospy.loginfo(f"[Photo Analyzer] Node started with params:\n" f"\t{frequency} Hz")
+    rospy.loginfo(
+        f"[Photo Analyzer] Node started with params:\n" 
+        f"\tFrequency: {frequency} Hz"
+        )
 
     photo_analyzer = PhotoAnalyzer(frequency, eval_mode)
     photo_analyzer.run()
