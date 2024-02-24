@@ -17,7 +17,7 @@ windows:
       panes:
         - |
           waitForRos
-          roslaunch ardupilot_gazebo kopterworx.launch use_sim_time:=true x:=1 y:=1 world:=$(rospack find icuas24_competition)/worlds/world_lit.world
+          roslaunch ardupilot_gazebo kopterworx.launch use_sim_time:=true x:=1 y:=1 world:=$(rospack find icuas24_competition)/worlds/well_lit.world
         - |
           waitForRos
           waitForSimulation
