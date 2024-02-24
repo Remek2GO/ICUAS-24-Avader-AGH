@@ -15,7 +15,7 @@ from tf.transformations import quaternion_from_euler
 from trajectory_msgs.msg import MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
 from typing import Dict, List, Tuple
 
-from scripts.utils import A_star, tsp
+from scripts.utils import tsp
 from scripts.utils.positions import POINTS_OF_INTEREST
 from scripts.utils.types import (
     PlantType,
