@@ -16,11 +16,11 @@ from .positions import (
 )
 from typing import List
 
-NUM_CHEBYSHEV_BETWEEN_BEDS = 3
-NUM_TIMES_REPEAT_POINT = 0
-NUM_CHEBYSHEV_CHANGE_BEDS = 3
-NUM_CHEBYSHEV_ALONG_BEDS_TO_START = 3
-NUM_CHEBYSHEV_BACK_TO_START = 3
+NUM_CHEBYSHEV_BETWEEN_BEDS = 0
+NUM_TIMES_REPEAT_POINT = 1
+NUM_CHEBYSHEV_CHANGE_BEDS = 1
+NUM_CHEBYSHEV_ALONG_BEDS_TO_START = 1
+NUM_CHEBYSHEV_BACK_TO_START = 1
 
 START_POINT = [1, 1, 1, 0, 0, 0]
 END_POINT = [1, 1, 2, 0, 0, 0]
@@ -63,7 +63,7 @@ def intermediate_points(points_to_visit):
     new_points = generate_intermediate_points(
         start_point, current_point, NUM_CHEBYSHEV_BETWEEN_BEDS
     )
-    # new_path += new_points
+    # new_path += new_point0
     # new_path.append(current_point)
 
     points_to_visit.insert(0, current_point)
