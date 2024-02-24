@@ -67,7 +67,9 @@ class PathSetter:
         rospy.Subscriber(
             "/avader/current_fruit_count", Int32, self._set_current_fruit_count_clb
         )
-        rospy.Subscriber("/avader/bed_image_data", BedImageData, self._bed_image_data_clb)
+        rospy.Subscriber(
+            "/avader/bed_image_data", BedImageData, self._bed_image_data_clb
+        )
         rospy.Subscriber(
             "/red/challenge_started", Bool, self._set_challenge_started_clb
         )
@@ -152,7 +154,7 @@ class PathSetter:
             # NOTE: Rate is intentionally at the beginning of the loop
             # to facilitate using the continue statement
             self.rate.sleep()
-            
+
             # UAV reached the last setpoint
             if self.path_status == PathStatus.REACHED and self.idx_setpoint == len(
                 self.setpoints
@@ -168,17 +170,19 @@ class PathSetter:
             ):
                 bed_id, bed_side = self.bed_view_order[self.idx_bed_view - 1]
                 current_setpoint = self.setpoints[self.idx_setpoint - 1]
-                curent_setpoint_list = [current_setpoint.x, 
-                                        current_setpoint.y, 
-                                        current_setpoint.z, 
-                                        current_setpoint.roll, 
-                                        current_setpoint.pitch, 
-                                        current_setpoint.yaw]
+                curent_setpoint_list = [
+                    current_setpoint.x,
+                    current_setpoint.y,
+                    current_setpoint.z,
+                    current_setpoint.roll,
+                    current_setpoint.pitch,
+                    current_setpoint.yaw,
+                ]
                 rospy.logdebug(
                     f"[Path Setter] Next photo setpoint: {POINTS_OF_INTEREST[bed_id][bed_side]}"
                 )
-                if (
-                    np.allclose(POINTS_OF_INTEREST[bed_id][bed_side], curent_setpoint_list) 
+                if np.allclose(
+                    POINTS_OF_INTEREST[bed_id][bed_side], curent_setpoint_list
                 ):
                     self.path_status = PathStatus.PROGRESS_TO_PHOTO
                     rospy.logdebug("[Path Setter] Flying to photo setpoint")
@@ -196,7 +200,9 @@ class PathSetter:
                 if self.bed_view_collected[bed_view]:
                     # Point is reached only if we have photo of the current bed view
                     self.path_status = PathStatus.REACHED
-                    self.idx_bed_view += 1 if self.idx_bed_view < len(self.bed_view_order) else 0
+                    self.idx_bed_view += (
+                        1 if self.idx_bed_view < len(self.bed_view_order) else 0
+                    )
                     rospy.logdebug("[Path Setter] Photo setpoint reached")
                 else:
                     # Otherwise, force UAV to move to the photo setpoint
@@ -220,7 +226,7 @@ class PathSetter:
                     self.pub_position_hold.publish(point)
                     rospy.logdebug("[Path Setter] Force moving to photo setpoint")
                 continue
-            
+
             # Tracker reached the normal setpoint
             if (
                 self.path_status == PathStatus.PROGRESS
@@ -240,7 +246,7 @@ class PathSetter:
                 # Send new setpoint to the tracker
                 self.set_setpoint(self.setpoints[self.idx_setpoint])
 
-                self.idx_setpoint += 1 
+                self.idx_setpoint += 1
                 self.path_status = PathStatus.WAITING
 
     def send_photo_poses(self, photo_poses: List[int]):
@@ -384,8 +390,7 @@ if __name__ == "__main__":
             )
         )
     else:
-        # A* setpoints
-        # setpoints, photo_poses = A_star.start(path_setter.plant_beds.bed_ids)
+        # TSP setpoints
         setpoints, photo_poses = tsp.start(path_setter.plant_beds.bed_ids)
         for setpoint in setpoints:
             path_setter.add_setpoint(Setpoint(*setpoint))
