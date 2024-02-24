@@ -53,7 +53,7 @@ def main(results_dir: str):
     std_final_points = np.std(final_points)
 
     # Print the summary
-    print(f"Results for {len(input_json_files)} test cases:")
+    print(f"Results from {len(input_json_files)} test cases:")
     print(
         f"\t{percentage_incorrect_fruit_count:.2%} with incorrect fruit count "
         f"({sum([1 for i, j in zip(fruit_count_gt, fruit_count_result) if i != j])} of "
@@ -85,67 +85,6 @@ def main(results_dir: str):
         print("Errorenous result(s):")
         for file, result in errorenous_results:
             print(f"{file}: {result}")
-
-    # # Create a summary
-    # summary = {
-    #     "n_test_cases": 0,
-    #     "n_test_cases_with_incorrect_fruit_count": 0,
-    #     "n_test_cases_with_collision": 0,
-    #     "n_test_cases with_missing_beds": 0,
-    #     "n_total_points_sum": 0,
-    # }
-
-    # # Gather data
-    # errorenous_results = {}
-    # for input_json_file in tqdm(input_json_files):
-    #     is_errorenous = False
-    #     with open(os.path.join(results_dir, input_json_file), "r") as f:
-    #         result = json.load(f)
-    #         summary["n_test_cases"] += 1
-    #         if result["fruit_count_gt"] != result["fruit_count_result"]:
-    #             summary["n_test_cases_with_incorrect_fruit_count"] += 1
-    #             is_errorenous = True
-    #         if result["collision_cnt"] > 0:
-    #             summary["n_test_cases_with_collision"] += 1
-    #             is_errorenous = True
-    #         if len(result["beds_not_counted"]) > 0:
-    #             summary["n_test_cases with_missing_beds"] += 1
-    #             is_errorenous = True
-    #         summary["n_total_points_sum"] += result["final_points"]
-    #     if is_errorenous:
-    #         errorenous_results[input_json_file] = result
-
-    # # Gather some statistics
-    # percentage_incorrect_fruit_count = (
-    #     summary["n_test_cases_with_incorrect_fruit_count"] / summary["n_test_cases"]
-    # )
-    # percentage_with_collision = (
-    #     summary["n_test_cases_with_collision"] / summary["n_test_cases"]
-    # )
-    # percentage_with_missing_beds = (
-    #     summary["n_test_cases with_missing_beds"] / summary["n_test_cases"]
-    # )
-    # avg_final_points = summary["n_total_points_sum"] / summary["n_test_cases"]
-
-    # # Print the summary
-    # print(f"{summary['n_test_cases']} test cases:")
-    # print(
-    #     f"\t{summary['n_test_cases_with_incorrect_fruit_count']} with incorrect fruit "
-    #     f"count [{percentage_incorrect_fruit_count:.2%}]"
-    # )
-    # print(
-    #     f"\t{summary['n_test_cases_with_collision']} with collision "
-    #     f"[{percentage_with_collision:.2%}]"
-    # )
-    # print(
-    #     f"\t{summary['n_test_cases with_missing_beds']} with missing beds "
-    #     f"[{percentage_with_missing_beds:.2%}]"
-    # )
-    # print(f"\tAverage final points: {avg_final_points:.2f}")
-    # if len(errorenous_results) > 0:
-    #     print("Errorenous result(s):")
-    #     for file, result in errorenous_results.items():
-    #         print(f"{file}:\n {result}")
 
 
 if __name__ == "__main__":
