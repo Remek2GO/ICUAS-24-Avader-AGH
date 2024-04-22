@@ -1,0 +1,4 @@
+BAG 1 fruit count: 18 yellow, 3 larger red, 5 smaller red
+BAG 2 fruit count: 18 yellow, 3 larger red, 5 smaller red
+BAG 3 fruit count: 18 yellow, 3 larger red, 5 smaller red
+BAG 4 fruit count: 23 yellow, 6 larger red, 10 smaller red
