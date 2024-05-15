@@ -11,7 +11,8 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   geometry_msgs
-  message_generation
+  # message_generation
+  sensor_msgs
   tf
 )
 
@@ -49,15 +50,15 @@ catkin_python_setup()
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-add_message_files(
-  FILES
-  AnalyzerResult.msg
-  BedImageData.msg
-  BedView.msg
-  BedViewArray.msg
-  ImageForAnalysis.msg
-  UavSetpoint.msg
-)
+# add_message_files(
+#   FILES
+#   AnalyzerResult.msg
+#   BedImageData.msg
+#   BedView.msg
+#   BedViewArray.msg
+#   ImageForAnalysis.msg
+#   UavSetpoint.msg
+# )
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -74,12 +75,12 @@ add_message_files(
 # )
 
 ## Generate added messages and services with any dependencies listed here
-generate_messages(
-  DEPENDENCIES
-  std_msgs  # Or other packages containing msgs
-  sensor_msgs
-  geometry_msgs
-)
+# generate_messages(
+#   DEPENDENCIES
+#   std_msgs  # Or other packages containing msgs
+#   sensor_msgs
+#   geometry_msgs
+# )
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -114,7 +115,7 @@ catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES icuas22_competition
 #  CATKIN_DEPENDS other_catkin_pkg
-  CATKIN_DEPENDS rospy std_msgs geometry_msgs message_runtime tf
+  CATKIN_DEPENDS rospy std_msgs geometry_msgs sensor_msgs message_runtime tf
 #  DEPENDS system_lib
 )
 
@@ -169,9 +170,7 @@ include_directories(
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
-  scripts/path_setter.py
-  scripts/photo_analyzer.py
-  scripts/photo_logger.py
+  scripts/main_node.py
   
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
