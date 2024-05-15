@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<launch>
+    <node name="main_node" pkg="icuas24_competition" type="main_node.py" output="screen"/>
+</launch>
