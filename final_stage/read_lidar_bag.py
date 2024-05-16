@@ -40,16 +40,22 @@ pcd = o3d.geometry.PointCloud()
 
 height, width, channels = 480, 640, 3
 
+from matplotlib import cm
+from scipy.spatial.transform import Rotation as R
+
+VIRIDIS = np.array(cm.get_cmap('viridis').colors)
+VID_RANGE = np.linspace(0.0, 1.0, VIRIDIS.shape[0])
+cv_img = np.zeros((height, width, 3), dtype=np.uint8)
 for topic, msg, t in bag.read_messages(topics=[lidar_topic, image_topic]):
 
     it += 1
-    if it < 600:
+    if it < 1500:
         continue
 
     # ax0.clear()
     # ax1.clear()
     # ax2.clear()
-
+    
     if topic == lidar_topic:
         lidar_data = pc2.read_points(
             msg, field_names=("x", "y", "z", "intensity", "ring"), skip_nans=True
@@ -57,20 +63,30 @@ for topic, msg, t in bag.read_messages(topics=[lidar_topic, image_topic]):
 
         # Convert the data to a format that can be used with open3d
         lidar_data = np.array(list(lidar_data))
-        # lidar_data[:, :2] = -1*lidar_data[:, :2]
 
+        rotation_matrix = R.from_rotvec([np.pi, 0, np.pi/18]).as_matrix()
+        translation_matrix = np.array([0,0,0])#np.array([-0.083, 0.0, -0.126])
+
+        lidar_data[:, :3] = np.dot(rotation_matrix, lidar_data[:, :3].T).T + translation_matrix
+
+
+        # lidar_data[:, :2] = -1*lidar_data[:, :2]
         # lidar_data = lidar_data[lidar_data[:,2] > 0.5]
 
-        # ax0.scatter(
-        #     lidar_data[:, 0], lidar_data[:, 1], c=lidar_data[:, 2], cmap="viridis", s=1
-        # )
-        # ax0.set_aspect("equal")
+
+
+
+        ax0 = plt.subplot(3, 2, 1)
+        ax0.scatter(
+            lidar_data[:, 0], lidar_data[:, 1], c=lidar_data[:, 3], cmap="viridis", s=1
+        )
+        ax0.set_aspect("equal")
 
         front_lidar_data = lidar_data[
-            np.logical_and(lidar_data[:, 0] > 0, lidar_data[:, 0] < 10)
+            np.logical_and(lidar_data[:, 0] > 0, lidar_data[:, 0] < 20)
         ]
         front_lidar_data = front_lidar_data[
-            np.logical_and(front_lidar_data[:, 1] > -5, front_lidar_data[:, 1] < 5)
+            np.logical_and(front_lidar_data[:, 1] > -15, front_lidar_data[:, 1] < 15)
         ]
 
         # distance at point y = 0 and z = 0 (in the lidar frame)
@@ -78,7 +94,7 @@ for topic, msg, t in bag.read_messages(topics=[lidar_topic, image_topic]):
         distance_x = front_lidar_data[
             np.logical_and(front_lidar_data[:, 1] > -0.1, front_lidar_data[:, 1] < 0.1)
         ][:, 0]
-        distance_lidar = np.mean(distance_x)
+        distance_lidar = np.mean(distance_x)/2
         image_lidar_data = front_lidar_data[
             np.logical_and(
                 front_lidar_data[:, 1] < distance_lidar,
@@ -86,7 +102,23 @@ for topic, msg, t in bag.read_messages(topics=[lidar_topic, image_topic]):
             )
         ]
 
+        ax1 = plt.subplot(3, 2, 2)
+        ax1.scatter(
+            front_lidar_data[:, 1], front_lidar_data[:, 2], c=front_lidar_data[:, 3], cmap="viridis", s=1
+        )
+        ax1.set_aspect("equal")
+
+        ax1 = plt.subplot(3, 2, 3)
+        ax1.scatter(
+            image_lidar_data[:, 1], image_lidar_data[:, 2], c=image_lidar_data[:, 3], cmap="viridis", s=1
+        )
+        ax1.set_aspect("equal")
+
         image = np.ones((height, width, 3), dtype=np.uint8) * 255
+
+        # only above the ground
+        image_lidar_data = image_lidar_data[image_lidar_data[:, 2] > 0]
+
 
         lidar_width_scale = (width - 1) / (
             np.max(image_lidar_data[:, 1]) - np.min(image_lidar_data[:, 1])
@@ -105,40 +137,30 @@ for topic, msg, t in bag.read_messages(topics=[lidar_topic, image_topic]):
         ).T
 
         value = np.array(
-            image_lidar_data[:, 0] / np.max(image_lidar_data[:, 0])  * 255,
+            image_lidar_data[:, 3] / np.max(image_lidar_data[:, 3])  * 255,
             dtype=np.int_,
         )
-        for x, y, data in zip(
-            image_lidar_data_norm[:, 0],
-            image_lidar_data_norm[:, 1],
-            value,
-        ):
-            # print(y, x, data)
-            image[int(y), int(x), :] = [128, data, 128]
+        # for x, y, data in zip(
+        #     image_lidar_data_norm[:, 0],
+        #     image_lidar_data_norm[:, 1],
+        #     value,
+        # ):
+        #     # print(y, x, data)
+        #     image[int(y), int(x), :] = [128, data, 128]
 
-        cv2.imshow("image_lidar_data", image)
+        ax1 = plt.subplot(3, 2, 4)
+        ax1.scatter(
+            image_lidar_data_norm[:, 0], image_lidar_data_norm[:, 1], c=value, cmap="viridis", s=1
+        )
 
-        # ax2.scatter(
-        #     image_lidar_data[:, 1], image_lidar_data[:, 2], c=image_lidar_data[:, 0], cmap="viridis", s=1
-        # )
-        # ax2.set_aspect("equal")
+        ax1 = plt.subplot(3, 2, 5)
+        ax1.imshow(cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB))
+        ax1.scatter(
+            image_lidar_data_norm[:, 0], max(image_lidar_data_norm[:, 1]) - image_lidar_data_norm[:, 1], c=value, cmap="viridis", s=1
+        )
 
-        # Create a point cloud
-        # pcd.points = o3d.utility.Vector3dVector(lidar_data[:, :3])
-        # Display the point cloud
+        
 
-        # o3d.visualization.draw_geometries([pcd])
-        # 3: add or update geometry objects
-        # if not create_o3d_obj:
-        #     vis.add_geometry(pcd)  # add point cloud
-        #     create_o3d_obj = True  # change flag
-        # else:
-        #     vis.update_geometry(pcd)  # update point cloud
-
-        # # 4 update o3d window
-        # if not vis.poll_events():
-        #     break
-        # vis.update_renderer()
 
     elif topic == image_topic:
         # Convert the ROS Image message to an OpenCV image
@@ -148,11 +170,11 @@ for topic, msg, t in bag.read_messages(topics=[lidar_topic, image_topic]):
         # Now cv_img is an OpenCV image, you can do any processing you need here.
         # For example, display the image
         cv2.imshow("image", cv_img)
-        cv2.waitKey(0)
+        cv2.waitKey(1)
 
     # plt.show()
-    # plt.draw()
-    # plt.pause(1)
+    plt.draw()
+    plt.pause(0.1)
 
     print(it)
 
