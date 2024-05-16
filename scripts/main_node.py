@@ -21,6 +21,9 @@ class MainNode:
         """Initialize the main node."""
         self._camera_image: np.ndarray = None
         self._cv_bridge = CvBridge()
+        self._gps_data: NavSatFix = None
+        self._imu_data: Imu = None
+        self._lidar_data: PointCloud2 = None
         self._rate = rospy.Rate(frequency)
 
         # ROS publishers
@@ -38,15 +41,15 @@ class MainNode:
 
     def _clb_gps(self, msg: NavSatFix):
         """Process the GPS data."""
-        rospy.loginfo("Received GPS data.")
+        self._gps_data = msg
 
     def _clb_imu(self, msg: Imu):
         """Process the IMU data."""
-        rospy.loginfo("Received IMU data.")
+        self._imu_data = msg
 
     def _clb_lidar(self, msg: PointCloud2):
         """Process the LiDAR data."""
-        rospy.loginfo("Received LiDAR data.")
+        self._lidar_data = msg
 
     def get_camera_image(self):
         """Get the camera image."""
