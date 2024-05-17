@@ -1,1 +1,0 @@
-/usr/lib/ccache/c++   -O2  -rdynamic CMakeFiles/smoke_test.dir/smoke_test.cpp.o  -o smoke_test  -Wl,-rpath,/root/sim_ws/src/icuas24_competition/armadillo-12.8.3/build ../libarmadillo.so.12.8.3 -lblas -llapack -larpack -lsuperlu 

@@ -1,1 +1,0 @@
-/usr/lib/ccache/c++ -fPIC  -O2  -Wl,--no-as-needed -shared -Wl,-soname,libarmadillo.so.12 -o libarmadillo.so.12.8.3 CMakeFiles/armadillo.dir/src/wrapper1.cpp.o CMakeFiles/armadillo.dir/src/wrapper2.cpp.o  -lblas -llapack -larpack -lsuperlu 
