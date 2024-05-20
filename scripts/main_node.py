@@ -6,13 +6,17 @@ from cv_bridge import CvBridge
 import cv2
 import numpy as np
 import rospy
+from sensor_msgs import point_cloud2
 from sensor_msgs.msg import CompressedImage, NavSatFix, Image, Imu, PointCloud2
+from std_msgs.msg import Header
+from tf.transformations import euler_from_quaternion, euler_matrix
 
 TOPIC_CAMERA = "/camera/color/image_raw/compressed"
 TOPIC_FRUIT_DETECTIONS = "/fruit_detections"
 TOPIC_GPS = "/hawkblue/mavros/global_position/global"
 TOPIC_IMU = "/hawkblue/mavros/imu/data"
 TOPIC_LIDAR = "/velodyne_points"
+TOPIC_ROTATED_LIDAR = "/rotated_lidar"
 
 
 class MainNode:
@@ -22,13 +26,21 @@ class MainNode:
         """Initialize the main node."""
         self._camera_image: np.ndarray = None
         self._cv_bridge = CvBridge()
+        self._current_pose: np.ndarray = None
         self._gps_data: NavSatFix = None
         self._imu_data: Imu = None
-        self._lidar_data: PointCloud2 = None
+        self._initial_rpy: np.ndarray = None
+        self._lidar_header: Header = None
+        self._lidar_intensity: float = None
+        self._lidar_points: np.ndarray = None
+        self._lidar_ring: int = None
         self._rate = rospy.Rate(frequency)
 
         # ROS publishers
         self._pub_camera = rospy.Publisher(TOPIC_FRUIT_DETECTIONS, Image, queue_size=1)
+        self._pub_rotated_lidar = rospy.Publisher(
+            TOPIC_ROTATED_LIDAR, PointCloud2, queue_size=1
+        )
 
         # ROS subscribers
         rospy.Subscriber(TOPIC_CAMERA, CompressedImage, self._clb_camera)
@@ -69,7 +81,7 @@ class MainNode:
         self._camera_image = cv2.undistort(
             distorted_img, camera_matrix, dist_coeffs, None, new_camera_matrix
         )
-        self.publish_fruit_detections()
+        # self.publish_fruit_detections()
 
     def _clb_gps(self, msg: NavSatFix):
         """Process the GPS data."""
@@ -78,10 +90,45 @@ class MainNode:
     def _clb_imu(self, msg: Imu):
         """Process the IMU data."""
         self._imu_data = msg
+        lidar_pose = euler_matrix(np.pi, 0.0, np.pi / 18)[:3, :3]
+        if self._initial_rpy is None:
+            self._initial_rpy = euler_from_quaternion(
+                [
+                    self._imu_data.orientation.x,
+                    self._imu_data.orientation.y,
+                    self._imu_data.orientation.z,
+                    self._imu_data.orientation.w,
+                ]
+            )
+        current_rpy = euler_from_quaternion(
+            [
+                self._imu_data.orientation.x,
+                self._imu_data.orientation.y,
+                self._imu_data.orientation.z,
+                self._imu_data.orientation.w,
+            ]
+        )
+        rpy_diff = np.array(current_rpy) - np.array(self._initial_rpy)
+        rospy.loginfo(
+            f"Roll: {rpy_diff[0]:.2f}, Pitch: {rpy_diff[1]:.2f}, Yaw: {rpy_diff[2]:.2f}"
+        )
+        self._current_pose = (
+            euler_matrix(rpy_diff[0], rpy_diff[1], rpy_diff[2])[:3, :3]
+        ) @ lidar_pose
 
     def _clb_lidar(self, msg: PointCloud2):
         """Process the LiDAR data."""
-        self._lidar_data = msg
+        # Read and
+        gen = point_cloud2.read_points(
+            msg, field_names=("x", "y", "z", "intensity", "ring")
+        )
+        points = list(gen)
+        self._lidar_header = msg.header
+        self._lidar_intensity = points[0][3]
+        self._lidar_points = np.dot(self._current_pose.T, np.array(points)[:, :3].T).T
+        self._lidar_ring = points[0][4]
+
+        # self.publish_rotated_lidar()
 
     def get_camera_image(self):
         """Get the camera image."""
@@ -95,13 +142,23 @@ class MainNode:
         msg = self._cv_bridge.cv2_to_imgmsg(camera_image, "bgr8")
         self._pub_camera.publish(msg)
 
+    def publish_rotated_lidar(self):
+        """Publish the rotated LiDAR data."""
+        if self._lidar_points is not None:
+            lidar_cloud = point_cloud2.create_cloud_xyz32(
+                self._lidar_header,
+                self._lidar_points,
+            )
+            self._pub_rotated_lidar.publish(lidar_cloud)
+
     def run_processing(self):
         """Run the processing."""
         rospy.loginfo("Running processing.")
 
         while not rospy.is_shutdown():
             self._rate.sleep()
-            # self.publish_fruit_detections()
+            self.publish_fruit_detections()
+            self.publish_rotated_lidar()
 
 
 if __name__ == "__main__":
