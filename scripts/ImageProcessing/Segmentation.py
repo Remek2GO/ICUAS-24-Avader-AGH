@@ -54,7 +54,6 @@ plt.title('HLS')
 
 plt.subplot(3, 3, 7)
 plt.imshow(image_luv)
-cv2.imshow('Tophat LUV U', image_luv)
 plt.title('LUV')
 
 plt.subplot(3, 3, 8)
@@ -84,7 +83,8 @@ plt.imshow(image_hsv_s)
 plt.title('HSV S')
 
 plt.subplot(6, 3, 3)
-plt.imshow(image_hsv_v)
+# plt.imshow((200 < image_hsv_v < 250).astype('uint8')*255)
+plt.imshow(cv2.inRange(image_hsv_v, 250, 255))
 plt.title('HSV V')
 
 plt.subplot(6, 3, 4)
@@ -231,4 +231,3 @@ plt.imshow(image_rgb)
 plt.title('Original')
 
 plt.show()
-cv2.waitKey(0)

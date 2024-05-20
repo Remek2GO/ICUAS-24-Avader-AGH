@@ -2,7 +2,7 @@ from distutils.core import setup
 from catkin_pkg.python_setup import generate_distutils_setup
 
 d = generate_distutils_setup(
-    packages=['scripts', 'msg', 'scripts.utils'],
+    packages=['scripts', 'msg', 'scripts.utils', 'scripts.ImageProcessing'],
     package_dir={'': 'icuas24_competition'}
 )
 
