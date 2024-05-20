@@ -2,6 +2,7 @@
 """Script to start the main node of the package."""
 
 from cv_bridge import CvBridge
+
 import cv2
 import numpy as np
 import rospy
@@ -37,7 +38,38 @@ class MainNode:
 
     def _clb_camera(self, msg: CompressedImage):
         """Process the camera image."""
-        self._camera_image = self._cv_bridge.compressed_imgmsg_to_cv2(msg)
+        distorted_img = self._cv_bridge.compressed_imgmsg_to_cv2(msg)
+        # self._camera_image = self._cv_bridge.compressed_imgmsg_to_cv2(msg)
+
+        # Undistort the image
+        camera_matrix = np.array(
+            [
+                [672.0395020303501, 0.0, 642.4371572558833],
+                [0.0, 313.0419989351929, 232.20148718757312],
+                [0.0, 0.0, 1.0],
+            ],
+            dtype=np.float32,
+        )
+        # dist_coeffs = np.array(
+        #     [
+        #         -0.732090958418714,
+        #         0.8017114744356094,
+        #         0.05425622628568444,
+        #         0.0011515109968409918,
+        #     ],
+        #     dtype=np.float32,
+        # )
+        dist_coeffs = np.array(
+            [0.0, 0.0, 0.0, 0.0],
+            dtype=np.float32,
+        )
+        new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(
+            camera_matrix, dist_coeffs, (640, 480), 1, (640, 480)
+        )
+        self._camera_image = cv2.undistort(
+            distorted_img, camera_matrix, dist_coeffs, None, new_camera_matrix
+        )
+        self.publish_fruit_detections()
 
     def _clb_gps(self, msg: NavSatFix):
         """Process the GPS data."""
@@ -69,7 +101,7 @@ class MainNode:
 
         while not rospy.is_shutdown():
             self._rate.sleep()
-            self.publish_fruit_detections()
+            # self.publish_fruit_detections()
 
 
 if __name__ == "__main__":
