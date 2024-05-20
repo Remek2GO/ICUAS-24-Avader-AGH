@@ -11,6 +11,8 @@ from sensor_msgs.msg import CompressedImage, NavSatFix, Image, Imu, PointCloud2
 from std_msgs.msg import Header
 from tf.transformations import euler_from_quaternion, euler_matrix
 
+import message_filters
+
 TOPIC_CAMERA = "/camera/color/image_raw/compressed"
 TOPIC_FRUIT_DETECTIONS = "/fruit_detections"
 TOPIC_GPS = "/hawkblue/mavros/global_position/global"
@@ -47,6 +49,26 @@ class MainNode:
         rospy.Subscriber(TOPIC_GPS, NavSatFix, self._clb_gps)
         rospy.Subscriber(TOPIC_IMU, Imu, self._clb_imu)
         rospy.Subscriber(TOPIC_LIDAR, PointCloud2, self._clb_lidar)
+
+
+
+        
+        # MW: Synchro TEST
+        # image_sub = message_filters.Subscriber(TOPIC_CAMERA, CompressedImage)
+        lidar_sub = message_filters.Subscriber(TOPIC_LIDAR, PointCloud2) 
+        imu_sub = message_filters.Subscriber(TOPIC_IMU, Imu)
+        # gps_sub = message_filters.Subscriber(TOPIC_GPS, NavSatFix)
+
+        self._time_synchronizer = message_filters.ApproximateTimeSynchronizer([lidar_sub, imu_sub], 10, 0.1, allow_headerless=True)
+        self._time_synchronizer.registerCallback(self._callback)
+    
+
+    # MW: Synchro TEST
+    def _callback(lidar, imu, gps): 
+        # 
+        rospy.loginfo(
+        f"Synchronized messages:"
+        )
 
     def _clb_camera(self, msg: CompressedImage):
         """Process the camera image."""
@@ -125,10 +147,10 @@ class MainNode:
         rospy.loginfo(
             f"Roll: {rpy_diff[0]:.2f}, Pitch: {rpy_diff[1]:.2f}, Yaw: {rpy_diff[2]:.2f}"
         )
-        # self._current_pose = (
-        #     euler_matrix(rpy_diff[0], rpy_diff[1], rpy_diff[2])[:3, :3]
-        # ) @ lidar_pose
-        self._current_pose = lidar_pose
+        self._current_pose = (
+            euler_matrix(rpy_diff[0], rpy_diff[1], rpy_diff[2])[:3, :3]
+        ) @ lidar_pose
+        # self._current_pose = lidar_pose
 
     def _clb_lidar(self, msg: PointCloud2):
         """Process the LiDAR data."""
@@ -179,3 +201,5 @@ if __name__ == "__main__":
     rospy.init_node("main_node", log_level=rospy.INFO)
     main_node = MainNode(frequency=50.0)
     main_node.run_processing()
+
+    
