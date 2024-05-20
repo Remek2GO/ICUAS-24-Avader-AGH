@@ -87,10 +87,15 @@ class MainNode:
         """Process the GPS data."""
         self._gps_data = msg
 
+    def rad2degree(self, radian):
+        return radian * 180 / np.pi
+
     def _clb_imu(self, msg: Imu):
         """Process the IMU data."""
         self._imu_data = msg
-        lidar_pose = euler_matrix(np.pi, 0.0, np.pi / 18)[:3, :3]
+
+        # Rotate the LiDAR data to the camera/ IMU frame
+        lidar_pose = euler_matrix(np.pi,  np.pi / 18, 0)[:3, :3]
         if self._initial_rpy is None:
             self._initial_rpy = euler_from_quaternion(
                 [
@@ -100,6 +105,14 @@ class MainNode:
                     self._imu_data.orientation.w,
                 ]
             )
+
+            rospy.loginfo(
+                f"Initial Roll: {self._initial_rpy[0]:.2f}, Pitch: {self._initial_rpy[1]:.2f}, Yaw: {self._initial_rpy[2]:.2f}"
+            )
+            rospy.loginfo(
+                f"Initial Roll: {self.rad2degree(self._initial_rpy[0]):.2f}, Pitch: {self.rad2degree(self._initial_rpy[1]):.2f}, Yaw: {self.rad2degree(self._initial_rpy[2]):.2f}"
+            )
+
         current_rpy = euler_from_quaternion(
             [
                 self._imu_data.orientation.x,
@@ -112,9 +125,10 @@ class MainNode:
         rospy.loginfo(
             f"Roll: {rpy_diff[0]:.2f}, Pitch: {rpy_diff[1]:.2f}, Yaw: {rpy_diff[2]:.2f}"
         )
-        self._current_pose = (
-            euler_matrix(rpy_diff[0], rpy_diff[1], rpy_diff[2])[:3, :3]
-        ) @ lidar_pose
+        # self._current_pose = (
+        #     euler_matrix(rpy_diff[0], rpy_diff[1], rpy_diff[2])[:3, :3]
+        # ) @ lidar_pose
+        self._current_pose = lidar_pose
 
     def _clb_lidar(self, msg: PointCloud2):
         """Process the LiDAR data."""
@@ -125,7 +139,7 @@ class MainNode:
         points = list(gen)
         self._lidar_header = msg.header
         self._lidar_intensity = points[0][3]
-        self._lidar_points = np.dot(self._current_pose.T, np.array(points)[:, :3].T).T
+        self._lidar_points = np.dot(self._current_pose, np.array(points)[:, :3].T).T
         self._lidar_ring = points[0][4]
 
         # self.publish_rotated_lidar()
