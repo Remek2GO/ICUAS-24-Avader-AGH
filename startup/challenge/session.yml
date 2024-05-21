@@ -6,6 +6,8 @@ windows:
       layout: tiled
       panes:
         - roscore
-        - waitForRos; roslaunch icuas24_competition bag_read.launch bag_file:=ICUAS_bag_2.bag
+        # - waitForRos; roslaunch icuas24_competition bag_read.launch bag_file:=ICUAS_calib_bag_2.bag
         - waitForRos; roslaunch icuas24_competition bag_processing.launch
+        # - waitForRos; rosrun rqt_gui rqt_gui
+        - waitForRos; rviz
         -

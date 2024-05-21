@@ -10,19 +10,22 @@ class ObjectParameters:
     x: float
     y: float
     area: int
-    visible: bool
-    invisibleCounter: int
-    # visibleCounter: int
+    visible: bool = True
+    invisibleCounter: int = 0
+    visibleCounter: int = 0
+    tracker: cv2.TrackerCSRT = None
+
 
 class AnalyzeFrame:
     def __init__(self):
         self.tempObjects = []
         self.objects = []
+        self.trackedObjects = []
         self.ID = 1
         self.frame = None
         self.yellow_count = 0
         self.red_count = 0
-    
+
     def iou(self, box_a, box_b):
         # Determine the (x, y)-coordinates of the intersection rectangle
         xa = max(box_a[0], box_b[0])
@@ -44,6 +47,10 @@ class AnalyzeFrame:
         # Return the intersection over union value
         return iou_val
 
+    def initializecorrfilter(self, frame, x, y):
+        tracker = cv2.TrackerCSRT.create()
+        tracker.init(frame, (x-8, y-8, 16, 16))
+        return tracker
 
     def distance(self, x1, y1, x2, y2):
         return ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
@@ -59,7 +66,7 @@ class AnalyzeFrame:
         # print(image_tophat_luv_u.max())
 
         # Normalize the image
-        image_tophat_luv_u_norm = cv2.normalize(image_tophat_luv_u, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
+        # image_tophat_luv_u_norm = cv2.normalize(image_tophat_luv_u, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
 
         # Display the red apples
         # cv2.imshow('Tophat LUV U', image_tophat_luv_u_norm)
@@ -72,6 +79,27 @@ class AnalyzeFrame:
 
         # Display the binarized image
         # cv2.imshow('Binary', image_bin.astype('uint8') * 255)
+
+        # Track objects using the CSRT tracker
+        for obj in self.trackedObjects.copy():
+            success, bbox = obj.tracker.update(frame)
+            if success:
+                obj.bbox = bbox
+                obj.x = bbox[0] + bbox[2] / 2
+                obj.y = bbox[1] + bbox[3] / 2
+                obj.visible = True
+                obj.invisibleCounter = 0
+                obj.visibleCounter += 1
+            else:
+                obj.visible = False
+                obj.invisibleCounter += 1
+                if obj.invisibleCounter > 50:
+                    self.trackedObjects.remove(obj)
+
+        # Remove the tracked pixels from the image_bin
+        for obj in self.trackedObjects:
+            x, y, w, h = obj.bbox
+            image_bin[y:y+h, x:x+w] = 0
 
         # Perform CCL and filter small objects
         num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(image_bin.astype('uint8'), connectivity=8)
@@ -89,7 +117,7 @@ class AnalyzeFrame:
             area = stats[i, cv2.CC_STAT_AREA]
 
             # Initialize the object parameters
-            obj = ObjectParameters(i, bbox, x_c, y_c, area, True, 0)
+            obj = ObjectParameters(i, bbox, x_c, y_c, area)
 
             self.tempObjects.append(obj)
 
@@ -101,8 +129,10 @@ class AnalyzeFrame:
         for tempObj in self.tempObjects:
             bestIoU = 0
             bestDistance = 100
+            bestDistTracked = 100
             bestIoUObj = None
             bestDistObj = None
+            bestTrackedObj = None
             for obj in self.objects:
                 iouVal = self.iou(tempObj.bbox, obj.bbox)
                 if iouVal > bestIoU and iouVal > 0.5:
@@ -112,6 +142,13 @@ class AnalyzeFrame:
                 if dist < bestDistance:
                     bestDistance = dist
                     bestDistObj = obj
+            for obj in self.trackedObjects:
+                if obj.visible:
+                    continue
+                dist = self.distance(tempObj.x, tempObj.y, obj.x, obj.y)
+                if dist < bestDistTracked:
+                    bestDistTracked = dist
+                    bestTrackedObj = obj
 
             if bestIoUObj is not None:
                 bestIoUObj.bbox = tempObj.bbox
@@ -120,6 +157,7 @@ class AnalyzeFrame:
                 bestIoUObj.area = tempObj.area
                 bestIoUObj.visible = True
                 bestIoUObj.invisibleCounter = 0
+                bestIoUObj.visibleCounter += 1
             elif bestDistObj is not None:
                 bestDistObj.bbox = tempObj.bbox
                 bestDistObj.x = tempObj.x
@@ -127,8 +165,19 @@ class AnalyzeFrame:
                 bestDistObj.area = tempObj.area
                 bestDistObj.visible = True
                 bestDistObj.invisibleCounter = 0
+                bestDistObj.visibleCounter += 1
+            elif bestTrackedObj is not None:
+                # Additional check based on correlation should be added here
+                bestTrackedObj.bbox = tempObj.bbox
+                bestTrackedObj.x = tempObj.x
+                bestTrackedObj.y = tempObj.y
+                bestTrackedObj.area = tempObj.area
+                bestTrackedObj.visible = True
+                bestTrackedObj.invisibleCounter = 0
+                bestTrackedObj.visibleCounter += 1
+                bestTrackedObj.tracker = self.initializecorrfilter(frame, int(bestTrackedObj.x), int(bestTrackedObj.y))
             else:
-                obj = ObjectParameters(self.ID, tempObj.bbox, tempObj.x, tempObj.y, tempObj.area, True, 0)
+                obj = ObjectParameters(self.ID, tempObj.bbox, tempObj.x, tempObj.y, tempObj.area)
                 self.objects.append(obj)
                 self.ID += 1
                 self.red_count += 1
@@ -137,11 +186,17 @@ class AnalyzeFrame:
         self.tempObjects.clear()
 
         # Analyse non-visible objects
-        for obj in self.objects:
+        for obj in self.objects.copy():
             if not obj.visible:
                 obj.invisibleCounter += 1
                 if obj.invisibleCounter > 50:
                     self.objects.remove(obj)
+
+        for obj in self.objects.copy():
+            if obj.visibleCounter > 10:
+                obj.tracker = self.initializecorrfilter(frame, int(obj.x), int(obj.y))
+                self.trackedObjects.append(obj)
+                self.objects.remove(obj)
 
         # Display the frame with bounding boxes and IDs
         for obj in self.objects:
@@ -150,6 +205,13 @@ class AnalyzeFrame:
             x, y, w, h = obj.bbox
             cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
             cv2.putText(frame, str(obj.id), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+
+        # Display the frame with tracked objects
+        for obj in self.trackedObjects:
+            x, y, w, h = obj.bbox
+            if obj.visible:
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 1)
+                cv2.putText(frame, str(obj.id), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
 
         # cv2.imshow('Bounding Box', frame)
         self.frame = frame
