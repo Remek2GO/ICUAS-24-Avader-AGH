@@ -5,10 +5,12 @@ from cv_bridge import CvBridge
 
 import numpy as np
 import rospy
+import math
 from sensor_msgs import point_cloud2
 from sensor_msgs.msg import CompressedImage, NavSatFix, Image, Imu, PointCloud2
 from std_msgs.msg import Header
 from tf.transformations import euler_from_quaternion, euler_matrix
+from scipy.spatial.transform import Rotation as R
 
 import message_filters
 
@@ -19,6 +21,8 @@ TOPIC_GPS = "/hawkblue/mavros/global_position/global"
 TOPIC_IMU = "/hawkblue/mavros/imu/data"
 TOPIC_LIDAR = "/velodyne_points"
 TOPIC_ROTATED_LIDAR = "/rotated_lidar"
+EARTH_RADIUS = 6378137.0
+e2 = 6.69437999014e-3  # eccentricity, WGS84
 
 
 class MainNode:
@@ -137,7 +141,7 @@ class MainNode:
             # )
             rospy.loginfo(
                 f"Initial Roll: {self.rad2degree(self._initial_imu_rpy[0]):.2f}, "
-                f"Pitch: {self.rad2degree(self._initial_imu_rpy[1]):.2f}, "
+                f"Pitch: {self.rad2degree(self._initial_imu_rpy[1]):.6f}, "
                 f"Yaw: {self.rad2degree(self._initial_imu_rpy[2]):.2f}"
             )
 
@@ -155,11 +159,11 @@ class MainNode:
         #     f"Pitch: {self.current_rpy[1]:.2f}, "
         #     f"Yaw: {self.current_rpy[2]:.2f}"
         # )
-        rospy.loginfo(
-            f"Roll: {self.rad2degree(self._current_rpy[0]):.2f}, "
-            f"Pitch: {self.rad2degree(self._current_rpy[1]):.2f}, "
-            f"Yaw: {self.rad2degree(self._current_rpy[2]):.2f}"
-        )
+        # rospy.loginfo(
+        #     f"Roll: {self.rad2degree(self._current_rpy[0]):.2f}, "
+        #     f"Pitch: {self.rad2degree(self._current_rpy[1]):.2f}, "
+        #     f"Yaw: {self.rad2degree(self._current_rpy[2]):.2f}"
+        # )
         # self._current_pose = euler_matrix(
         #     self.current_rpy[0], self.current_rpy[1], self.current_rpy[2]
         # )[:3, :3] @ lidar_pose
@@ -191,6 +195,40 @@ class MainNode:
         if self._camera_image is None:
             return np.zeros((480, 640, 3), dtype=np.uint8)
         return self._camera_image
+
+    def get_fruit_localization(self):
+        """Get localization of fruit based on image and lidar"""
+        fruit_center = [-7, 15, -2]
+
+        if self._imu_data is not None:
+            rotation_euler = euler_from_quaternion(
+                [
+                    self._imu_data.orientation.x,
+                    self._imu_data.orientation.y,
+                    self._imu_data.orientation.z,
+                    self._imu_data.orientation.w,
+                ]
+            )
+            lat = math.radians(self._gps_data.latitude)
+            lon = math.radians(self._gps_data.longitude)
+            sin_lat = math.sin(lat)
+            cos_lat = math.cos(lat)
+            cos_lon = math.cos(lon)
+            sin_lon = math.sin(lon)
+
+            rn = EARTH_RADIUS / math.sqrt(1 - e2 * sin_lat * sin_lat)
+            X = (rn + self._gps_data.altitude) * cos_lat * cos_lon
+            Y = (rn + self._gps_data.altitude) * cos_lat * sin_lon
+            Z = self._gps_data.altitude
+
+            YAW_OFFSET = 1.1868
+            gps_position = np.array([X, Y, Z])
+            rot_matrix = R.from_rotvec(
+                [rotation_euler[0], rotation_euler[1]+YAW_OFFSET, rotation_euler[2]]
+            ).as_matrix()
+
+            fruit_localization = np.dot(rot_matrix, fruit_center) + gps_position
+            return fruit_localization
 
     def publish_fruit_detections(self):
         """Publish the fruit detections in the image."""
@@ -241,6 +279,7 @@ class MainNode:
             self.publish_fruit_detections()
             # self.publish_rotated_lidar()
             self.publish_global_map()
+            self.get_fruit_localization()
 
 
 if __name__ == "__main__":
