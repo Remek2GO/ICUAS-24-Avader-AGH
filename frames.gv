@@ -1,0 +1,18 @@
+digraph G {
+"map" -> "map_ned"[label="Broadcaster: /bag_player\nAverage rate: 10000.000 Hz\nMost recent transform: 0.000 ( 1716248353.200 sec old)\nBuffer length: 0.000 sec\n"];
+"odom" -> "odom_ned"[label="Broadcaster: /bag_player\nAverage rate: 10000.000 Hz\nMost recent transform: 0.000 ( 1716248353.200 sec old)\nBuffer length: 0.000 sec\n"];
+"base_link" -> "base_link_frd"[label="Broadcaster: /bag_player\nAverage rate: 10000.000 Hz\nMost recent transform: 0.000 ( 1716248353.200 sec old)\nBuffer length: 0.000 sec\n"];
+"odom" -> "hawkblue/imu_link"[label="Broadcaster: /ekf_se\nAverage rate: 102.041 Hz\nMost recent transform: 1712911697.507 ( 3336655.693 sec old)\nBuffer length: 0.490 sec\n"];
+edge [style=invis];
+ subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
+"Recorded at time: 1716248353.200"[ shape=plaintext ] ;
+ }->"map";
+edge [style=invis];
+ subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
+"Recorded at time: 1716248353.200"[ shape=plaintext ] ;
+ }->"odom";
+edge [style=invis];
+ subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
+"Recorded at time: 1716248353.200"[ shape=plaintext ] ;
+ }->"base_link";
+}

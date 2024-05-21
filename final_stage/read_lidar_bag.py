@@ -13,7 +13,7 @@ bridge = CvBridge()
 
 path = "/root/sim_ws/src/icuas24_competition/bags/"
 # path = "/home/vision/Documents/Repositorium/icuas24_avader/bags/"
-video_no = 1
+video_no = 2
 
 ### VIDEO BAG
 video_name = f"ICUAS_bag_{video_no}.bag"
@@ -60,12 +60,10 @@ for topic, msg, t in bag.read_messages(topics=[lidar_topic, image_topic]):
         lidar_data = pc2.read_points(
             msg, field_names=("x", "y", "z", "intensity", "ring"), skip_nans=True
         )
-
         # Convert the data to a format that can be used with open3d
         lidar_data = np.array(list(lidar_data))
-
         rotation_matrix = R.from_rotvec([np.pi, 0, np.pi/18]).as_matrix()
-        translation_matrix = np.array([0,0,0])#np.array([-0.083, 0.0, -0.126])
+        translation_matrix = np.array([-0.083, 0.0, -0.126]) #np.array([0,0,0])#
 
         lidar_data[:, :3] = np.dot(rotation_matrix, lidar_data[:, :3].T).T + translation_matrix
 

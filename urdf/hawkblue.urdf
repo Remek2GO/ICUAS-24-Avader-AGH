@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<robot name="hawkblue">
+    <link name="hawkblue/imu_link">
+    <joint name="imu_link_to_base_link" type="fixed">
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <parent link="base_link"/>
+        <child link="hawkblue/imu_link"/>
+    </joint>
+</robot>

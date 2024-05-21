@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<launch>
+    <node name="pc2pcd"  pkg="pcl_ros" type="pointcloud_to_pcd" args="input:=/velodyne_points" output="screen"/>
+    <node name="save_img" pkg="icuas24_competition" type="photo_logger.py" output="screen"/>
+</launch>
