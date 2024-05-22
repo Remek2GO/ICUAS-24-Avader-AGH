@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import rosbag
 import sys
 import numpy as np
+import utm
 
 import pyproj
 
@@ -19,7 +20,7 @@ if __name__ == "__main__":
 
     # bag_path = sys.argv[1]
     root_path = "/root/sim_ws/src/icuas24_competition/"
-    bag_name = "ICUAS_bag_4"
+    bag_name = "ICUAS_bag_1"
     bag_path = root_path + "bags/" + bag_name + ".bag"
     npy_path = root_path + "gps_data/" + bag_name + ".npy"
 
@@ -58,10 +59,28 @@ if __name__ == "__main__":
 
     # X = (X - X[0])*100000
     # Y = (Y - Y[0])*100000
+    EARTH_RADIUS = 6378000.0
+    x = EARTH_RADIUS*np.cos(recorded_data["latitude"])*np.cos(recorded_data["longitude"])
+    y = EARTH_RADIUS*np.cos(recorded_data["latitude"])*np.sin(recorded_data["longitude"])
+    x = x - x[0]
+    y = y - y[0]
+
+    # normalizuj zmienne x i y do zakresu 0 1
+    x = (x - np.min(x))/(np.max(x) - np.min(x))
+    y = (y - np.min(y))/(np.max(y) - np.min(y))
+    x2,y2 = utm.from_latlon(recorded_data["latitude"], recorded_data["longitude"])
+    x2 = x2 - x2[0]
+    y2 = y2 - y2[0]
+
+    x2 = (x2 - np.min(x2))/(np.max(x2) - np.min(x2))
+    y2 = (y2 - np.min(y2))/(np.max(y2) - np.min(y2))
 
     X, Y = transformer.transform(X, Y)
     X = X - X[0]
     Y = Y - Y[0]
+
+    X = (X - np.min(X))/(np.max(X) - np.min(X))
+    Y = (Y - np.min(Y))/(np.max(Y) - np.min(Y))
 
 
     fig = plt.figure()
@@ -72,18 +91,22 @@ if __name__ == "__main__":
     ax.set_ylabel('Longitude')
     ax.set_zlabel('Altitude')
     ax.plot3D(X, Y, Z, 'gray')
+    ax.plot3D(x, y, Z, 'red')
+    ax.plot3D(x2, y2, Z, 'blue')
 
-    plt.savefig(root_path + "gps_data/" + bag_name + '_3D.png', dpi=300, bbox_inches='tight')
+    # plt.savefig(root_path + "gps_data/" + bag_name + '_3D.png', dpi=300, bbox_inches='tight')
 
     fig = plt.figure()
     ax = fig.gca()
     ax.plot(X, Y, 'gray')
+    ax.plot(x,y, 'red')
+    ax.plot(x2,y2, 'blue')
     ax.set_xlabel('Latitude')
     ax.set_ylabel('Longitude')
     ax.scatter(X[0], Y[0], c='g', marker='o')
     ax.scatter(X[-1], Y[-1], c='r', marker='o')
 
-    plt.savefig(root_path + "gps_data/" + bag_name + '_2D.png', dpi=300, bbox_inches='tight')
+    # plt.savefig(root_path + "gps_data/" + bag_name + '_2D.png', dpi=300, bbox_inches='tight')
 
     plt.show()
 

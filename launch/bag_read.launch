@@ -2,5 +2,6 @@
 <launch>
     <arg name="bag_file" default="ICUAS_bag_1.bag" />
 
-    <node name="bag_player" pkg="rosbag" type="play" args="$(find icuas24_competition)/bags/$(arg bag_file)" output="screen"/>
+    <node name="bag_player" pkg="rosbag" type="play" args="$(find icuas24_competition)/bags/$(arg bag_file) -l" output="screen"/>
+    <node name="republish_img_raw" pkg="image_transport" type="republish" args="compressed in:=/camera/color/image_raw raw out:=/camera/color/image_raw"/>
 </launch>

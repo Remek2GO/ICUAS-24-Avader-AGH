@@ -1,0 +1,16 @@
+<launch>
+  <!-- <arg name="model"/>
+  <param name= "robot_description" textfile="$(find icuas24_competition)/urdf/hawkblue.urdf" />  -->
+  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_se" clear_params="true">
+    <rosparam command="load" file="$(find icuas24_competition)/config/ekf_localization.yaml" />
+    <!--  Placeholder for output topic remapping
+    <remap from="odometry/filtered" to=""/>
+    <remap from="accel/filtered" to=""/>
+    -->
+    <!-- <remap from="hawkblue/imu_link" to="NAMESPACE/base_link"/> -->
+  </node>
+
+  <node pkg="tf" type="static_transform_publisher" name="base_link_to_hawkblue" args="0 0 0 0 0 0 base_link hawkblue/imu_link 100"/>
+  <node pkg="tf" type="static_transform_publisher" name="base_link_to_NAMESPACE" args="0 0 0 0 0 0 base_link NAMESPACE/base_link 100"/>
+  
+</launch>

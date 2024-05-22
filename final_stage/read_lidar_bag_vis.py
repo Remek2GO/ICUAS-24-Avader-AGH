@@ -14,13 +14,13 @@ bridge = CvBridge()
 
 path = "/root/sim_ws/src/icuas24_competition/bags/"
 # path = "/home/vision/Documents/Repositorium/icuas24_avader/bags/"
-video_no = 3
+video_no = 2
 
 ### VIDEO BAG
 video_name = f"ICUAS_bag_{video_no}.bag"
 
 ### CALIBRATION BAG
-# video_name = f"ICUAS_calib_bag_{video_no}.bag"
+video_name = f"ICUAS_calib_bag_{video_no}.bag"
 
 
 ## Read the bag
