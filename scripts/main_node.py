@@ -24,11 +24,10 @@ TOPIC_GLOBAL_MAP = "/global_map"
 TOPIC_GPS = "/hawkblue/mavros/global_position/global"
 TOPIC_GPS_POSITION = "/gps_position"
 TOPIC_IMAGE_LIDAR_POINTS = "/image_lidar_points"
-TOPIC_IMAGE_LIDAR_MAP = "/image_lidar_map"
+TOPIC_IMAGE_LIDAR_POINTS_V2 = "/image_lidar_points_v2"
 TOPIC_IMU = "/hawkblue/mavros/imu/data"
 TOPIC_IMU_POSITION = "/imu_position"
 TOPIC_LIDAR = "/velodyne_points"
-TOPIC_ROTATED_LIDAR = "/rotated_lidar"
 
 EARTH_RADIUS = 6378137.0
 E2 = 6.69437999014e-3  # eccentricity, WGS84
@@ -52,7 +51,7 @@ class MainNode:
         self._gps_position_initial: np.ndarray = None
         self._gps_position_id: int = 0
         self._image_lidar_points: np.ndarray = None
-        self._image_norm = np.zeros((480, 640, 3), dtype=np.uint8)
+        self._image_lidar_points_v2: np.ndarray = None
         self._imu_data: Imu = None
         self._imu_rpy_initial: np.ndarray = None
         self._imu_rpy_current: np.ndarray = None
@@ -60,8 +59,6 @@ class MainNode:
         self._imu_velocity: np.ndarray = np.zeros(3)
         self._imu_position_id: int = 0
         self._lidar_header: Header = None
-        self._lidar_image_points: np.ndarray = None
-        self._lidar_image_points_norm: np.ndarray = None
         self._lidar_intensity: float = None
         self._lidar_points: np.ndarray = None
         self._lidar_ring: int = None
@@ -91,19 +88,14 @@ class MainNode:
         self._pub_imu_position = rospy.Publisher(
             TOPIC_IMU_POSITION, PointStamped, queue_size=1
         )
-        self._pub_rotated_lidar = rospy.Publisher(
-            TOPIC_ROTATED_LIDAR, PointCloud2, queue_size=1
-        )
-        self._pub_image_lidar_map = rospy.Publisher(
-            TOPIC_IMAGE_LIDAR_MAP, PointCloud2, queue_size=1
-        )
+
         self._pub_image_lidar_points = rospy.Publisher(
             TOPIC_IMAGE_LIDAR_POINTS, Image, queue_size=1
         )
-        self._pub_image_lidar = rospy.Publisher(
-            "/image_lidar", PointCloud2, queue_size=1
+        self._pub_image_lidar_points_v2 = rospy.Publisher(
+            TOPIC_IMAGE_LIDAR_POINTS_V2, Image, queue_size=1
         )
-        self._pub_norm_image = rospy.Publisher("/norm_image", Image, queue_size=1)
+
 
         # ROS subscribers
         # rospy.Subscriber(TOPIC_CAMERA, CompressedImage, self._clb_camera)
@@ -262,7 +254,6 @@ class MainNode:
         points = list(gen)
         self._lidar_header = msg.header
         self._lidar_intensity = points[0][3]
-
         self._lidar_ring = points[0][4]
 
         # Update global map
@@ -307,7 +298,7 @@ class MainNode:
                 [0.0, 0.0, 1.0],
             ]
         )
-        K = self._camera_intrinsics
+        # K = self._camera_intrinsics
 
         D = np.array(
             [
@@ -339,13 +330,13 @@ class MainNode:
 
         image_cv2 = image_cv2[visible]
 
-        image = self.get_camera_image()
+        image = self.get_camera_image().copy()
         for point in image_cv2[:]:
             image = cv2.circle(
-                self._camera_image, (int(point[1]), int(point[0])), 1, (0, 0, 255), -1
+                image, (int(point[1]), int(point[0])), 1, (0, 0, 255), -1
             )
 
-        self._image_norm = image
+        self._image_lidar_points = image
 
     def _clb_lidar_v2(self, msg: PointCloud2):
         """Process the LiDAR data."""
@@ -435,7 +426,7 @@ class MainNode:
         points_on_2d = np.dot(self._camera_intrinsics, _camera_plane_points.T).T
 
         # Lidar points in the camera image
-        camera_img = self.get_camera_image()
+        camera_img = self.get_camera_image().copy()
         for point in points_on_2d[:]:
             # Avoid overflow errors
             try:
@@ -449,7 +440,7 @@ class MainNode:
             except Exception as e:
                 print(e)
                 pass
-        self._image_lidar_points = camera_img
+        self._image_lidar_points_v2 = camera_img
 
     def get_camera_image(self):
         """Get the camera image."""
@@ -510,7 +501,7 @@ class MainNode:
 
     def publish_fruit_detections(self):
         """Publish the fruit detections in the image."""
-        camera_image = self.get_camera_image()
+        camera_image = self.get_camera_image().copy()
         msg = self._cv_bridge.cv2_to_imgmsg(camera_image, "bgr8")
         self._pub_camera.publish(msg)
 
@@ -551,6 +542,12 @@ class MainNode:
             msg = self._cv_bridge.cv2_to_imgmsg(self._image_lidar_points, "bgr8")
             self._pub_image_lidar_points.publish(msg)
 
+    def publish_image_lidar_points_v2(self):
+        """Publish the Image LiDAR data."""
+        if self._image_lidar_points_v2 is not None:
+            msg = self._cv_bridge.cv2_to_imgmsg(self._image_lidar_points_v2, "bgr8")
+            self._pub_image_lidar_points_v2.publish(msg)
+
     def publish_imu_position(self):
         """Publish the IMU position."""
         if self._imu_position is not None:
@@ -564,49 +561,39 @@ class MainNode:
             self._pub_imu_position.publish(msg)
             self._imu_position_id += 1
 
-    def publish_rotated_lidar(self):
-        """Publish the rotated LiDAR data."""
-        if self._lidar_points is not None:
-            header = Header()
-            header.stamp = rospy.Time.now()
-            header.frame_id = "hawkblue/imu_link"
-            header.seq = self._lidar_rotated_id
-            lidar_cloud = point_cloud2.create_cloud_xyz32(
-                header,
-                self._lidar_points,
-            )
-            self._pub_rotated_lidar.publish(lidar_cloud)
-            self._lidar_rotated_id += 1
+    # def publish_rotated_lidar(self):
+    #     """Publish the rotated LiDAR data."""
+    #     if self._lidar_points is not None:
+    #         header = Header()
+    #         header.stamp = rospy.Time.now()
+    #         header.frame_id = "hawkblue/imu_link"
+    #         header.seq = self._lidar_rotated_id
+    #         lidar_cloud = point_cloud2.create_cloud_xyz32(
+    #             header,
+    #             self._lidar_points,
+    #         )
+    #         self._pub_rotated_lidar.publish(lidar_cloud)
+    #         self._lidar_rotated_id += 1
 
-    def publish_image_lidar_map(self):
-        """Publish the Image LiDAR data."""
-        if self._lidar_image_points is not None:
-            lidar_cloud = point_cloud2.create_cloud_xyz32(
-                self._lidar_header,
-                self._lidar_image_points,
-            )
-            self._pub_image_lidar_map.publish(lidar_cloud)
+    # def publish_image_lidar_map(self):
+    #     """Publish the Image LiDAR data."""
+    #     if self._lidar_image_points is not None:
+    #         lidar_cloud = point_cloud2.create_cloud_xyz32(
+    #             self._lidar_header,
+    #             self._lidar_image_points,
+    #         )
+    #         self._pub_image_lidar_map.publish(lidar_cloud)
 
-    def publish_image_lidar(self):
-        """Publish the Image LiDAR data."""
-        if self._lidar_image_points_norm is not None:
-            lidar_cloud = point_cloud2.create_cloud_xyz32(
-                self._lidar_header,
-                self._lidar_image_points_norm,
-            )
-            self._pub_image_lidar.publish(lidar_cloud)
+    # def publish_image_lidar(self):
+    #     """Publish the Image LiDAR data."""
+    #     if self._lidar_image_points_norm is not None:
+    #         lidar_cloud = point_cloud2.create_cloud_xyz32(
+    #             self._lidar_header,
+    #             self._lidar_image_points_norm,
+    #         )
+    #         self._pub_image_lidar.publish(lidar_cloud)
 
-    def publish_image_lidar_points(self):
-        """Publish the Image LiDAR data."""
-        if self._image_lidar_points is not None:
-            msg = self._cv_bridge.cv2_to_imgmsg(self._image_lidar_points, "bgr8")
-            self._pub_image_lidar_points.publish(msg)
 
-    def publish_norm_image(self):
-        """Publish the Image LiDAR data."""
-        if self._image_norm is not None:
-            msg = self._cv_bridge.cv2_to_imgmsg(self._image_norm, "bgr8")
-            self._pub_norm_image.publish(msg)
 
     def rad2degree(self, radian: float) -> float:
         """Convert radians to degrees.
@@ -626,12 +613,10 @@ class MainNode:
         while not rospy.is_shutdown():
             self._rate.sleep()
             # self.publish_fruit_detections()
-            # self.publish_rotated_lidar()
             # self.publish_global_map()
             # self.get_fruit_localization()
-            # self.publish_image_lidar_map()
-            self.publish_norm_image()
             self.publish_image_lidar_points()
+            self.publish_image_lidar_points_v2()
 
 
 if __name__ == "__main__":
