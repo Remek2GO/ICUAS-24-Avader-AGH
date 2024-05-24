@@ -11,8 +11,10 @@ from sensor_msgs.msg import CompressedImage, NavSatFix, Image, Imu, PointCloud2
 from std_msgs.msg import Header
 from tf.transformations import euler_from_quaternion, euler_matrix
 from scipy.spatial.transform import Rotation as R
-
+import cv2
 import message_filters
+
+import image_geometry  # for PinholeCameraModel
 
 TOPIC_CAMERA = "/camera/color/image_raw/compressed"
 TOPIC_FRUIT_DETECTIONS = "/fruit_detections"
@@ -72,10 +74,7 @@ class MainNode:
             "/image_lidar", PointCloud2, queue_size=1
         )
 
-
         self._pub_norm_image = rospy.Publisher("/norm_image", Image, queue_size=1)
-
-        
 
         # ROS subscribers
         # rospy.Subscriber(TOPIC_CAMERA, CompressedImage, self._clb_camera)
@@ -200,114 +199,178 @@ class MainNode:
         points = list(gen)
         self._lidar_header = msg.header
         self._lidar_intensity = points[0][3]
-        self._lidar_points = np.dot(self._lidar_pose, np.array(points)[:, :3].T).T + np.dot(self._lidar_pose, self._lidar_translation)
+
+        # self._lidar_points = np.dot(
+        #     self._lidar_pose, np.array(points)[:, :3].T
+        # ).T + np.dot(self._lidar_pose, self._lidar_translation)
+
         self._lidar_ring = points[0][4]
 
         # Update global map
-        if self._current_rpy is not None:
-            rot_matrix = euler_matrix(
-                self._current_rpy[0], self._current_rpy[1], self._current_rpy[2]
-            )[:3, :3]
-            self._global_map = np.dot(rot_matrix, self._lidar_points.T).T
-
-
-        # Filter the lidar data in X-axis 
-        # self._lidar_points --> [x, y, z]  
+        # if self._current_rpy is not None:
+        #     rot_matrix = euler_matrix(
+        #         self._current_rpy[0], self._current_rpy[1], self._current_rpy[2]
+        #     )[:3, :3]
+        #     self._global_map = np.dot(rot_matrix, self._lidar_points.T).T
 
         # Filter the lidar data in X-axis
-        front_lidar_data = self._lidar_points[
-            np.logical_and(self._lidar_points[:, 0] > 0, self._lidar_points[:, 0] < np.inf)
+        # self._lidar_points --> [x, y, z]
+
+        points_lidar = np.array(points)[:, :3]
+        # Filter the lidar data in X-axis
+        front_lidar_data = points_lidar[
+            np.logical_and(points_lidar[:, 0] > 0, points_lidar[:, 0] < np.inf)
         ]
         # Filter the lidar data in Y-axis
-        front_lidar_data = front_lidar_data[
+        points_lidar = front_lidar_data[
             np.logical_and(front_lidar_data[:, 1] > -15, front_lidar_data[:, 1] < 15)
         ]
+        angle_x = np.arctan2(points_lidar[:, 1], points_lidar[:, 0])
 
-        # calculate distance at point y = 0 and z = 0 (in the lidar frame)
-        distance_x = front_lidar_data[
-            np.logical_and(front_lidar_data[:, 1] > -0.1, front_lidar_data[:, 1] < 0.1)
-        ][:, 0]
+        # calculate angle point from center of lidar and filter them
+        # points_lidar = points_lidar[
+        #     np.logical_and(
+        #         angle_x > np.radians(-33),
+        #         angle_x < np.radians(33),
+        #     )
+        # ]
+        # angle_y = np.arctan2(points_lidar[:, 2], points_lidar[:, 0])
+        # points_lidar = points_lidar[
+        #     np.logical_and(
+        #         angle_y > np.radians(-45),
+        #         angle_y < np.radians(10),
+        #     )
+        # ]
 
-        # calculate the distance of the lidar data and
-        # calculate half size of image
-        distance_lidar = np.mean(distance_x) / 2
-        image_lidar_data = front_lidar_data[
-            np.logical_and(
-                front_lidar_data[:, 1] < distance_lidar,
-                front_lidar_data[:, 1] > -1 * distance_lidar,
-            )
-        ]
-        self._lidar_image_points  = image_lidar_data
-
-        # print(np.min(image_lidar_data[:, 0]), np.max(image_lidar_data[:, 0]))
-        # print(np.min(image_lidar_data[:, 1]), np.max(image_lidar_data[:, 1]))
-        # print(np.min(image_lidar_data[:, 2]), np.max(image_lidar_data[:, 2]))
-        
-        height, width, channel = self.get_camera_image().shape
-        # image = np.ones((height, width, channel), dtype=np.uint8) * 255
-
-        # only above the ground
-        # image_lidar_data = image_lidar_data[image_lidar_data[:, 2] < 0]
-
-        print(image_lidar_data.shape)
-
-        lidar_width_scale = (width - 1) / (
-            np.max(image_lidar_data[:, 1]) - np.min(image_lidar_data[:, 1])
-        )
-        lidar_height_scale = (height//2 - 1) / (
-            np.max(image_lidar_data[:, 2]) - np.min(image_lidar_data[:, 2])
-        )
-
-        # image_lidar_data_norm = np.array(
-        #     [   image_lidar_data[:, 0],
-        #         (image_lidar_data[:, 1])
-        #         * lidar_width_scale,
-        #         (image_lidar_data[:, 2])
-        #         * lidar_height_scale,
-        #     ]
-        # ).T
-
-        # how to use project lidar point to image
-        image_lidar_data_norm = np.array(
+        K = np.array(
             [
-                (image_lidar_data[:, 1] - np.min(image_lidar_data[:, 1]))
-                * lidar_width_scale,
-                (image_lidar_data[:, 2] - np.min(image_lidar_data[:, 2]))
-                * lidar_height_scale,
+                [556.451448389196, 0.0, 319.297706499726],
+                [0.0, 555.404890964252, 223.046111850854],
+                [0.0, 0.0, 1.0],
             ]
-        ).T
+        )
 
-        # display on the image
-        
-        self._image_norm = self.get_camera_image().copy()
+        D = np.array(
+            [
+                0.067875242949499,
+                -0.160971333363663099,
+                -0.008792577462950867,
+                -0.000882174321070191,
+                0.0,
+            ]
+        )
+        D_zero = np.zeros((5, 1))
 
-        
-        K = np.array([[672.0395020303501, 0.0, 642.4371572558833],
-                        [0.0, 313.0419989351929, 232.20148718757312],
-                        [0.0, 0.0, 1.0]])
-        
+        X, Y, Z = -0.435, -0.5, 0.652 #-0.054
+        ROLL, PITCH, YAW = 126.0, -1.0, -127.0
 
+        tvec = np.array([X, Y, Z])
+        rvec = np.array([np.radians(ROLL), np.radians(PITCH), np.radians(YAW)])
 
+        tvec_zero = np.array([0.0, 0.0, 0.0])
+        rvec_zero = np.array([0.0, 0.0, 0.0])
 
-        # for i in range(image_lidar_data_norm.shape[0]):
-        #     x, y = int(image_lidar_data_norm[i, 0]), int(image_lidar_data_norm[i, 1])
-        #     image[y, x] = [0, 0, 0]
+        image_cv2, _ = cv2.projectPoints(points_lidar, rvec, tvec, K, D)
+        image_cv2 = np.squeeze(image_cv2)
 
-        # msg = self._cv_bridge.cv2_to_imgmsg(image, "bgr8")
-        # self._pub_norm_image.publish(msg)
+        visible = np.logical_and.reduce(
+            (
+                image_cv2[:, 0] > 0,
+                image_cv2[:, 0] < 480,
+                image_cv2[:, 1] > 0,
+                image_cv2[:, 1] < 640,
+            )
+        )
 
+        image_cv2 = image_cv2[visible]
 
+        image = np.zeros((480, 640, 3), dtype=np.uint8)
+        for point in image_cv2[:]:
+            image = cv2.circle(
+                self._camera_image, (int(point[1]), int(point[0])), 1, (0, 0, 255), -1
+            )
 
-        # self._lidar_image_points_norm = image_lidar_data_norm
+        if image is not None:
+            self._image_norm = image
 
-        # rospy.loginfo(f"Number of points: {lidar_width_scale} {lidar_height_scale}")
-        # rospy.loginfo(f"Shape: {image_lidar_data_norm.shape}")
+    # From Camera Coordinate system to Image frame
+    def rect2Img(self, rect_pts, img_width, img_height):
 
-        # print(np.min(image_lidar_data_norm[:, 0]), np.max(image_lidar_data_norm[:, 0]))
-        # print(np.min(image_lidar_data_norm[:, 1]), np.max(image_lidar_data_norm[:, 1]))
-        # print(np.min(image_lidar_data_norm[:, 2]), np.max(image_lidar_data_norm[:, 2]))
+        # P = [[556.451448, 0.0, 319.2977, 0.0],
+        #     [0.0, 555.40489, 223.046111, 0.0],
+        #     [0.0, 0.0, 1.0, 0.0]]
 
-        # self.publish_rotated_lidar()
+        P = [
+            [-0.0271029, 0.245919, -0.968911, 0.202985],
+            [-0.519154, -0.831765, -0.196588, 3.16132],
+            [-0.854251, 0.497686, 0.150213, 15.0031],
+            [0, 0, 0, 1],
+        ]
+
+        # -0.0610643 0.726876 0.684049 -0.395947
+        # -0.416194 0.604365 -0.679357 -1.17568
+        # -0.907223 -0.326182 0.265617 1.26412
+        # 0 0 0 1
+
+        # 0.102264 0.716849 0.689688 0.0043066
+        # -0.261592 0.6883 -0.676619 -0.442761
+        # -0.959746 -0.111223 0.25791 0.0207961
+        # 0 0 0 1
+
+        n = rect_pts.shape[0]
+        points_hom = np.hstack((rect_pts, np.ones((n, 1))))
+        points_2d = np.dot(points_hom, np.transpose(P))  # nx3
+        points_2d[:, 0] /= points_2d[:, 2]
+        points_2d[:, 1] /= points_2d[:, 2]
+
+        print(points_2d)
+
+        mask = (
+            (points_2d[:, 0] >= 0)
+            & (points_2d[:, 0] <= img_width)
+            & (points_2d[:, 1] >= 0)
+            & (points_2d[:, 1] <= img_height)
+        )
+        mask = mask & (rect_pts[:, 2] > 2)
+        return points_2d[mask, 0:2], mask
+
+    def dense_map(self, Pts, n, m, grid):
+        ng = 2 * grid + 1
+
+        mX = np.zeros((m, n)) + np.cfloat("inf")
+        mY = np.zeros((m, n)) + np.cfloat("inf")
+        mD = np.zeros((m, n))
+        mX[np.int32(Pts[1]), np.int32(Pts[0])] = Pts[0] - np.round(Pts[0])
+        mY[np.int32(Pts[1]), np.int32(Pts[0])] = Pts[1] - np.round(Pts[1])
+        mD[np.int32(Pts[1]), np.int32(Pts[0])] = Pts[2]
+
+        KmX = np.zeros((ng, ng, m - ng, n - ng))
+        KmY = np.zeros((ng, ng, m - ng, n - ng))
+        KmD = np.zeros((ng, ng, m - ng, n - ng))
+
+        for i in range(ng):
+            for j in range(ng):
+                KmX[i, j] = mX[i : (m - ng + i), j : (n - ng + j)] - grid - 1 + i
+                KmY[i, j] = mY[i : (m - ng + i), j : (n - ng + j)] - grid - 1 + i
+                KmD[i, j] = mD[i : (m - ng + i), j : (n - ng + j)]
+        S = np.zeros_like(KmD[0, 0])
+        Y = np.zeros_like(KmD[0, 0])
+
+        for i in range(ng):
+            for j in range(ng):
+                s = 1 / np.sqrt(KmX[i, j] * KmX[i, j] + KmY[i, j] * KmY[i, j])
+                Y = Y + s * KmD[i, j]
+                S = S + s
+
+        S[S == 0] = 1
+        out = np.zeros((m, n))
+        out[grid + 1 : -grid, grid + 1 : -grid] = Y / S
+        return out
+
+    def depthFromVec(self, xyz):
+        mag = np.sqrt(xyz[0] * xyz[0] + xyz[1] * xyz[1] + xyz[2] * xyz[2])
+        pixel_val = mag * 256.0
+        return pixel_val
 
     def get_camera_image(self):
         """Get the camera image."""
@@ -343,7 +406,7 @@ class MainNode:
             YAW_OFFSET = 1.1868
             gps_position = np.array([X, Y, Z])
             rot_matrix = R.from_rotvec(
-                [rotation_euler[0], rotation_euler[1]+YAW_OFFSET, rotation_euler[2]]
+                [rotation_euler[0], rotation_euler[1] + YAW_OFFSET, rotation_euler[2]]
             ).as_matrix()
 
             fruit_localization = np.dot(rot_matrix, fruit_center) + gps_position
@@ -386,6 +449,7 @@ class MainNode:
                 self._lidar_image_points,
             )
             self._pub_image_lidar_map.publish(lidar_cloud)
+
     def publish_image_lidar(self):
         """Publish the Image LiDAR data."""
         if self._lidar_image_points_norm is not None:
@@ -421,8 +485,8 @@ class MainNode:
             self.publish_fruit_detections()
             # self.publish_rotated_lidar()
             self.publish_global_map()
-            self.get_fruit_localization()
-            self.publish_image_lidar_map()
+            # self.get_fruit_localization()
+            # self.publish_image_lidar_map()
             self.publish_norm_image()
 
 
