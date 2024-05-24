@@ -127,6 +127,7 @@ class MainNode:
         """Process the synchronized data."""
         # self._clb_gps(gps)
         self._clb_lidar_v2(lidar)
+        self._clb_lidar(lidar)
         self._clb_camera(img)
 
         # rospy.loginfo("Synchronized data received")
@@ -262,10 +263,6 @@ class MainNode:
         self._lidar_header = msg.header
         self._lidar_intensity = points[0][3]
 
-        # self._lidar_points = np.dot(
-        #     self._lidar_pose, np.array(points)[:, :3].T
-        # ).T + np.dot(self._lidar_pose, self._lidar_translation)
-
         self._lidar_ring = points[0][4]
 
         # Update global map
@@ -277,7 +274,6 @@ class MainNode:
 
         # Filter the lidar data in X-axis
         # self._lidar_points --> [x, y, z]
-
         points_lidar = np.array(points)[:, :3]
         # Filter the lidar data in X-axis
         front_lidar_data = points_lidar[
@@ -311,6 +307,7 @@ class MainNode:
                 [0.0, 0.0, 1.0],
             ]
         )
+        K = self._camera_intrinsics
 
         D = np.array(
             [
@@ -321,16 +318,12 @@ class MainNode:
                 0.0,
             ]
         )
-        D_zero = np.zeros((5, 1))
 
-        X, Y, Z = -0.435, -0.5, 0.652 #-0.054
+        X, Y, Z = -0.435, -0.054, 0.652  # -0.054
         ROLL, PITCH, YAW = 126.0, -1.0, -127.0
 
         tvec = np.array([X, Y, Z])
         rvec = np.array([np.radians(ROLL), np.radians(PITCH), np.radians(YAW)])
-
-        tvec_zero = np.array([0.0, 0.0, 0.0])
-        rvec_zero = np.array([0.0, 0.0, 0.0])
 
         image_cv2, _ = cv2.projectPoints(points_lidar, rvec, tvec, K, D)
         image_cv2 = np.squeeze(image_cv2)
@@ -355,7 +348,6 @@ class MainNode:
         self._image_norm = image
 
     def _clb_lidar_v2(self, msg: PointCloud2):
-        
         """Process the LiDAR data."""
         # Read and
         gen = point_cloud2.read_points(
@@ -365,11 +357,13 @@ class MainNode:
         points = list(gen)
         self._lidar_header = msg.header
         self._lidar_intensity = points[0][3]
+
         # TODO: Is this translation correct?
         self._lidar_points = np.dot(
             self._lidar_pose, np.array(points)[:, :3].T
         ).T + np.dot(self._lidar_pose, self._lidar_translation)
         self._lidar_ring = points[0][4]
+
         # Update global map
         lidar_in_imu_coords = np.array([0.067, 0.0, 0.246])
 
@@ -384,7 +378,6 @@ class MainNode:
             local_map += self._gps_position.T
             self._global_map.append(local_map)
 
-        
         # Transform the lidar data to the camera frame
         lidar_rotation = euler_matrix(0.0, -np.pi / 18, 0.0)[:3, :3]
         lidar_translation = np.array([-0.083, 0.0, 0.126])
@@ -412,6 +405,7 @@ class MainNode:
         # calculate the distance of the lidar data and
         # calculate half size of image
         mean_distance_lidar = np.mean(distance_x)
+
         print(f"Mean distance: {mean_distance_lidar}")
         distance_lidar = mean_distance_lidar / 0.5
         image_lidar_data = front_lidar_data[
@@ -456,7 +450,6 @@ class MainNode:
                 print(e)
                 pass
         self._image_lidar_points = camera_img
-
 
     def get_camera_image(self):
         """Get the camera image."""
@@ -634,10 +627,10 @@ class MainNode:
             self._rate.sleep()
             # self.publish_fruit_detections()
             # self.publish_rotated_lidar()
-            self.publish_global_map()
+            # self.publish_global_map()
             # self.get_fruit_localization()
             # self.publish_image_lidar_map()
-            # self.publish_norm_image()
+            self.publish_norm_image()
             self.publish_image_lidar_points()
 
 
