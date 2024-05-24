@@ -6,11 +6,12 @@ from cv_bridge import CvBridge
 import numpy as np
 import rospy
 import math
+from collections import deque
+from geometry_msgs.msg import PointStamped
 from sensor_msgs import point_cloud2
 from sensor_msgs.msg import CompressedImage, NavSatFix, Image, Imu, PointCloud2
 from std_msgs.msg import Header
 from tf.transformations import euler_from_quaternion, euler_matrix
-from scipy.spatial.transform import Rotation as R
 
 import message_filters
 
@@ -18,11 +19,16 @@ TOPIC_CAMERA = "/camera/color/image_raw/compressed"
 TOPIC_FRUIT_DETECTIONS = "/fruit_detections"
 TOPIC_GLOBAL_MAP = "/global_map"
 TOPIC_GPS = "/hawkblue/mavros/global_position/global"
+TOPIC_GPS_POSITION = "/gps_position"
 TOPIC_IMU = "/hawkblue/mavros/imu/data"
+TOPIC_IMU_POSITION = "/imu_position"
 TOPIC_LIDAR = "/velodyne_points"
 TOPIC_ROTATED_LIDAR = "/rotated_lidar"
+
 EARTH_RADIUS = 6378137.0
-e2 = 6.69437999014e-3  # eccentricity, WGS84
+E2 = 6.69437999014e-3  # eccentricity, WGS84
+G = 9.81  # gravity acceleration, m/s^2
+LIDAR_FRAME_WINDOW = 10
 
 
 class MainNode:
@@ -32,17 +38,25 @@ class MainNode:
         """Initialize the main node."""
         self._camera_image: np.ndarray = None
         self._cv_bridge = CvBridge()
-        self._current_rpy: np.ndarray = None
         self._current_pose: np.ndarray = None
-        self._global_map: np.ndarray = None
+        self._current_rpy: np.ndarray = None
+        self._global_map: deque = deque([], maxlen=LIDAR_FRAME_WINDOW)
         self._global_map_id: int = 0
         self._gps_data: NavSatFix = None
+        self._gps_position: np.ndarray = None
+        self._gps_position_initial: np.ndarray = None
+        self._gps_position_id: int = 0
         self._imu_data: Imu = None
-        self._initial_imu_rpy: np.ndarray = None
+        self._imu_rpy_initial: np.ndarray = None
+        self._imu_rpy_current: np.ndarray = None
+        self._imu_position: np.ndarray = np.zeros(3)
+        self._imu_velocity: np.ndarray = np.zeros(3)
+        self._imu_position_id: int = 0
         self._lidar_header: Header = None
         self._lidar_intensity: float = None
         self._lidar_points: np.ndarray = None
         self._lidar_ring: int = None
+        self._lidar_rotated_id: int = 0
         self._rate = rospy.Rate(frequency)
 
         # Sensors' poses
@@ -52,6 +66,12 @@ class MainNode:
         self._pub_camera = rospy.Publisher(TOPIC_FRUIT_DETECTIONS, Image, queue_size=1)
         self._pub_global_map = rospy.Publisher(
             TOPIC_GLOBAL_MAP, PointCloud2, queue_size=1
+        )
+        self._pub_gps_position = rospy.Publisher(
+            TOPIC_GPS_POSITION, PointStamped, queue_size=1
+        )
+        self._pub_imu_position = rospy.Publisher(
+            TOPIC_IMU_POSITION, PointStamped, queue_size=1
         )
         self._pub_rotated_lidar = rospy.Publisher(
             TOPIC_ROTATED_LIDAR, PointCloud2, queue_size=1
@@ -64,10 +84,10 @@ class MainNode:
         # rospy.Subscriber(TOPIC_LIDAR, PointCloud2, self._clb_lidar)
 
         # MW: Synchro TEST
+        # gps_sub = message_filters.Subscriber(TOPIC_GPS, NavSatFix)
         image_sub = message_filters.Subscriber(TOPIC_CAMERA, CompressedImage)
         lidar_sub = message_filters.Subscriber(TOPIC_LIDAR, PointCloud2)
         # imu_sub = message_filters.Subscriber(TOPIC_IMU, Imu)
-        # gps_sub = message_filters.Subscriber(TOPIC_GPS, NavSatFix)
 
         self._time_synchronizer = message_filters.ApproximateTimeSynchronizer(
             [lidar_sub, image_sub], 10, 0.1, allow_headerless=False
@@ -77,6 +97,7 @@ class MainNode:
     # MW: Synchro TEST
     def _clb_sync(self, lidar: PointCloud2, img: CompressedImage):
         """Process the synchronized data."""
+        # self._clb_gps(gps)
         self._clb_lidar(lidar)
         self._clb_camera(img)
 
@@ -118,14 +139,47 @@ class MainNode:
     def _clb_gps(self, msg: NavSatFix):
         """Process the GPS data."""
         self._gps_data = msg
+        if self._gps_position is None:
+            self._gps_position_initial = self.get_gps_position()
+
+            # Wait for the valid initial GPS position
+            if self._gps_position_initial is None:
+                return
+        self._gps_position = self.get_gps_position() - self._gps_position_initial
 
     def _clb_imu(self, msg: Imu):
         """Process the IMU data."""
+        # Get position from IMU data
+        if self._imu_data is not None:
+            dt = (msg.header.stamp - self._imu_data.header.stamp).to_sec()
+            self._imu_position += self._imu_velocity * dt + 0.5 * (
+                np.array(
+                    [
+                        msg.linear_acceleration.x,
+                        msg.linear_acceleration.y,
+                        msg.linear_acceleration.z - G,
+                    ]
+                )
+                * dt
+                * dt
+            )
+            self._imu_velocity += (
+                np.array(
+                    [
+                        msg.linear_acceleration.x,
+                        msg.linear_acceleration.y,
+                        msg.linear_acceleration.z - G,
+                    ]
+                )
+                * dt
+            )
+
+        # Update IMU data
         self._imu_data = msg
 
         # Rotate the LiDAR data to the camera/ IMU frame
-        if self._initial_imu_rpy is None:
-            self._initial_imu_rpy = euler_from_quaternion(
+        if self._imu_rpy_initial is None:
+            self._imu_rpy_initial = euler_from_quaternion(
                 [
                     self._imu_data.orientation.x,
                     self._imu_data.orientation.y,
@@ -140,12 +194,12 @@ class MainNode:
             #     f"Yaw: {self._initial_rpy[2]:.2f}"
             # )
             rospy.loginfo(
-                f"Initial Roll: {self.rad2degree(self._initial_imu_rpy[0]):.2f}, "
-                f"Pitch: {self.rad2degree(self._initial_imu_rpy[1]):.6f}, "
-                f"Yaw: {self.rad2degree(self._initial_imu_rpy[2]):.2f}"
+                f"Initial Roll: {self.rad2degree(self._imu_rpy_initial[0]):.2f}, "
+                f"Pitch: {self.rad2degree(self._imu_rpy_initial[1]):.6f}, "
+                f"Yaw: {self.rad2degree(self._imu_rpy_initial[2]):.2f}"
             )
 
-        current_imu_rpy = euler_from_quaternion(
+        self._imu_rpy_current = euler_from_quaternion(
             [
                 self._imu_data.orientation.x,
                 self._imu_data.orientation.y,
@@ -153,21 +207,20 @@ class MainNode:
                 self._imu_data.orientation.w,
             ]
         )
-        self._current_rpy = np.array(current_imu_rpy) - np.array(self._initial_imu_rpy)
+        rospy.loginfo(
+            f"Roll: {self.rad2degree(self._imu_rpy_current[0]):.2f}, "
+            f"Pitch: {self.rad2degree(self._imu_rpy_current[1]):.2f}, "
+            f"Yaw: {self.rad2degree(self._imu_rpy_current[2]):.2f}"
+        )
+
+        self._current_rpy = np.array(self._imu_rpy_current) - np.array(
+            self._imu_rpy_initial
+        )
         # rospy.loginfo(
-        #     f"Roll: {self.current_rpy[0]:.2f}, "
-        #     f"Pitch: {self.current_rpy[1]:.2f}, "
-        #     f"Yaw: {self.current_rpy[2]:.2f}"
+        #     f"Roll: {self._current_rpy[0]:.2f}, "
+        #     f"Pitch: {self._current_rpy[1]:.2f}, "
+        #     f"Yaw: {self._current_rpy[2]:.2f}"
         # )
-        # rospy.loginfo(
-        #     f"Roll: {self.rad2degree(self._current_rpy[0]):.2f}, "
-        #     f"Pitch: {self.rad2degree(self._current_rpy[1]):.2f}, "
-        #     f"Yaw: {self.rad2degree(self._current_rpy[2]):.2f}"
-        # )
-        # self._current_pose = euler_matrix(
-        #     self.current_rpy[0], self.current_rpy[1], self.current_rpy[2]
-        # )[:3, :3] @ lidar_pose
-        # self._current_pose = lidar_pose
 
     def _clb_lidar(self, msg: PointCloud2):
         """Process the LiDAR data."""
@@ -182,11 +235,17 @@ class MainNode:
         self._lidar_ring = points[0][4]
 
         # Update global map
-        if self._current_rpy is not None:
+        lidar_in_imu_coords = np.array([0.067, 0.0, 0.246])
+        if self._imu_rpy_current is not None and self._gps_position is not None:
             rot_matrix = euler_matrix(
-                self._current_rpy[0], self._current_rpy[1], self._current_rpy[2]
+                self._imu_rpy_current[0],
+                self._imu_rpy_current[1],
+                self._imu_rpy_current[2],
             )[:3, :3]
-            self._global_map = np.dot(rot_matrix, self._lidar_points.T).T
+            local_map = np.dot(rot_matrix, self._lidar_points.T).T
+            local_map += lidar_in_imu_coords.T
+            local_map += self._gps_position.T
+            self._global_map.append(local_map)
 
         # self.publish_rotated_lidar()
 
@@ -197,10 +256,11 @@ class MainNode:
         return self._camera_image
 
     def get_fruit_localization(self):
-        """Get localization of fruit based on image and lidar"""
+        """Get localization of fruit based on image and lidar."""
         fruit_center = [-7, 15, -2]
 
-        if self._imu_data is not None:
+        gps_position = self.get_gps_position()
+        if self._imu_data is not None and gps_position is not None:
             rotation_euler = euler_from_quaternion(
                 [
                     self._imu_data.orientation.x,
@@ -209,26 +269,42 @@ class MainNode:
                     self._imu_data.orientation.w,
                 ]
             )
-            lat = math.radians(self._gps_data.latitude)
-            lon = math.radians(self._gps_data.longitude)
-            sin_lat = math.sin(lat)
-            cos_lat = math.cos(lat)
-            cos_lon = math.cos(lon)
-            sin_lon = math.sin(lon)
 
-            rn = EARTH_RADIUS / math.sqrt(1 - e2 * sin_lat * sin_lat)
-            X = (rn + self._gps_data.altitude) * cos_lat * cos_lon
-            Y = (rn + self._gps_data.altitude) * cos_lat * sin_lon
-            Z = self._gps_data.altitude
-
-            YAW_OFFSET = 1.1868
-            gps_position = np.array([X, Y, Z])
-            rot_matrix = R.from_rotvec(
-                [rotation_euler[0], rotation_euler[1]+YAW_OFFSET, rotation_euler[2]]
-            ).as_matrix()
+            yaw_offset = 1.1868
+            rot_matrix = euler_matrix(
+                rotation_euler[0], rotation_euler[1] + yaw_offset, rotation_euler[2]
+            )[:3, :3]
 
             fruit_localization = np.dot(rot_matrix, fruit_center) + gps_position
+
             return fruit_localization
+
+    def get_gps_position(self) -> np.ndarray:
+        """Get the GPS position in meters.
+
+        Returns:
+            np.ndarray: The GPS position in meters.
+        """
+        if self._gps_data is None:
+            return None
+        lat = math.radians(self._gps_data.latitude)
+        lon = math.radians(self._gps_data.longitude)
+        sin_lat = math.sin(lat)
+        cos_lat = math.cos(lat)
+        cos_lon = math.cos(lon)
+        sin_lon = math.sin(lon)
+
+        rn = EARTH_RADIUS / math.sqrt(1 - E2 * sin_lat * sin_lat)
+        x = (rn + self._gps_data.altitude) * cos_lat * cos_lon
+        y = (rn + self._gps_data.altitude) * cos_lat * sin_lon
+        z = self._gps_data.altitude
+
+        # Convert to IMU frame
+        x_imu = y
+        y_imu = -x
+        z_imu = z
+
+        return np.array([x_imu, y_imu, z_imu])
 
     def publish_fruit_detections(self):
         """Publish the fruit detections in the image."""
@@ -238,26 +314,61 @@ class MainNode:
 
     def publish_global_map(self):
         """Publish the global map."""
-        if self._global_map is not None:
+        if len(self._global_map) > 0:
+            # Convert glonal map deque to PointCloud2
+            all_points = np.concatenate(self._global_map, axis=0)
+
+            # Create message
             msg_header = Header()
             msg_header.stamp = rospy.Time.now()
-            msg_header.frame_id = "velodyne"
+            msg_header.frame_id = "hawkblue/imu_link"
             msg_header.seq = self._global_map_id
             global_map = point_cloud2.create_cloud_xyz32(
                 msg_header,
-                self._global_map,
+                all_points,
             )
             self._pub_global_map.publish(global_map)
             self._global_map_id += 1
 
+    def publish_gps_position(self):
+        """Publish the GPS position."""
+        if self._gps_position is not None:
+            msg = PointStamped()
+            msg.header.stamp = rospy.Time.now()
+            msg.header.frame_id = "hawkblue/imu_link"
+            msg.header.seq = self._gps_position_id
+            msg.point.x = self._gps_position[0]
+            msg.point.y = self._gps_position[1]
+            msg.point.z = self._gps_position[2]
+            self._pub_gps_position.publish(msg)
+            self._gps_position_id += 1
+
+    def publish_imu_position(self):
+        """Publish the IMU position."""
+        if self._imu_position is not None:
+            msg = PointStamped()
+            msg.header.stamp = rospy.Time.now()
+            msg.header.frame_id = "hawkblue/imu_link"
+            msg.header.seq = self._imu_position_id
+            msg.point.x = self._imu_position[0]
+            msg.point.y = self._imu_position[1]
+            msg.point.z = self._imu_position[2]
+            self._pub_imu_position.publish(msg)
+            self._imu_position_id += 1
+
     def publish_rotated_lidar(self):
         """Publish the rotated LiDAR data."""
         if self._lidar_points is not None:
+            header = Header()
+            header.stamp = rospy.Time.now()
+            header.frame_id = "hawkblue/imu_link"
+            header.seq = self._lidar_rotated_id
             lidar_cloud = point_cloud2.create_cloud_xyz32(
-                self._lidar_header,
+                header,
                 self._lidar_points,
             )
             self._pub_rotated_lidar.publish(lidar_cloud)
+            self._lidar_rotated_id += 1
 
     def rad2degree(self, radian: float) -> float:
         """Convert radians to degrees.
@@ -277,9 +388,11 @@ class MainNode:
         while not rospy.is_shutdown():
             self._rate.sleep()
             self.publish_fruit_detections()
-            # self.publish_rotated_lidar()
+            self.publish_rotated_lidar()
             self.publish_global_map()
-            self.get_fruit_localization()
+            self.publish_gps_position()
+            self.publish_imu_position()
+            # self.get_fruit_localization()
 
 
 if __name__ == "__main__":
