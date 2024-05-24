@@ -49,12 +49,12 @@ class AnalyzeFrame:
 
     def initializecorrfilter(self, frame, x, y):
         tracker = cv2.TrackerCSRT.create()
-        tracker.init(frame, (x-8, y-8, 16, 16))
+        tracker.init(frame, (x - 8, y - 8, 16, 16))
         return tracker
 
     def distance(self, x1, y1, x2, y2):
         return ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
-    
+
     def analizer(self, frame):
         image_luv = cv2.cvtColor(frame, cv2.COLOR_BGR2Luv)
         image_luv_l, image_luv_u, image_luv_v = cv2.split(image_luv)
@@ -75,7 +75,7 @@ class AnalyzeFrame:
         image_bin = image_tophat_luv_u > 10
 
         # Median filter
-        image_bin = cv2.medianBlur(image_bin.astype('uint8'), 5)
+        image_bin = cv2.medianBlur(image_bin.astype("uint8"), 5)
 
         # Display the binarized image
         # cv2.imshow('Binary', image_bin.astype('uint8') * 255)
@@ -99,18 +99,26 @@ class AnalyzeFrame:
         # Remove the tracked pixels from the image_bin
         for obj in self.trackedObjects:
             x, y, w, h = obj.bbox
-            image_bin[y:y+h, x:x+w] = 0
+            x, y, w, h = int(x), int(y), int(w), int(h)
+
+            image_bin[y : y + h, x : x + w] = 0
 
         # Perform CCL and filter small objects
-        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(image_bin.astype('uint8'), connectivity=8)
+        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+            image_bin.astype("uint8"), connectivity=8
+        )
 
         # Intersection over Union tracking
         for i in range(1, num_labels):
             if stats[i, cv2.CC_STAT_AREA] < 10:
                 continue
 
-            x, y, w, h = stats[i, cv2.CC_STAT_LEFT], stats[i, cv2.CC_STAT_TOP], stats[i, cv2.CC_STAT_WIDTH], stats[
-                i, cv2.CC_STAT_HEIGHT]
+            x, y, w, h = (
+                stats[i, cv2.CC_STAT_LEFT],
+                stats[i, cv2.CC_STAT_TOP],
+                stats[i, cv2.CC_STAT_WIDTH],
+                stats[i, cv2.CC_STAT_HEIGHT],
+            )
             bbox = (x, y, w, h)
             x_c = centroids[i, 0]
             y_c = centroids[i, 1]
@@ -175,13 +183,17 @@ class AnalyzeFrame:
                 bestTrackedObj.visible = True
                 bestTrackedObj.invisibleCounter = 0
                 bestTrackedObj.visibleCounter += 1
-                bestTrackedObj.tracker = self.initializecorrfilter(frame, int(bestTrackedObj.x), int(bestTrackedObj.y))
+                bestTrackedObj.tracker = self.initializecorrfilter(
+                    frame, int(bestTrackedObj.x), int(bestTrackedObj.y)
+                )
             else:
-                obj = ObjectParameters(self.ID, tempObj.bbox, tempObj.x, tempObj.y, tempObj.area)
+                obj = ObjectParameters(
+                    self.ID, tempObj.bbox, tempObj.x, tempObj.y, tempObj.area
+                )
                 self.objects.append(obj)
                 self.ID += 1
                 self.red_count += 1
-                print('New object added with ID:', obj.id)
+                print("New object added with ID:", obj.id)
 
         self.tempObjects.clear()
 
@@ -204,15 +216,34 @@ class AnalyzeFrame:
                 continue
             x, y, w, h = obj.bbox
             cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-            cv2.putText(frame, str(obj.id), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+            cv2.putText(
+                frame,
+                str(obj.id),
+                (x, y),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 255, 0),
+                1,
+            )
 
         # Display the frame with tracked objects
         for obj in self.trackedObjects:
             x, y, w, h = obj.bbox
+            x, y, w, h = int(x), int(y), int(w), int(h)
+
             if obj.visible:
                 cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 1)
-                cv2.putText(frame, str(obj.id), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+                cv2.putText(
+                    frame,
+                    str(obj.id),
+                    (x, y),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (0, 0, 255),
+                    1,
+                )
 
+        # rospy.loginfo("Red count: ")
         # cv2.imshow('Bounding Box', frame)
         self.frame = frame
         return frame

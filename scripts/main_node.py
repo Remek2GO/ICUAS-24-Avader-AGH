@@ -15,8 +15,13 @@ from std_msgs.msg import Header
 from tf.transformations import euler_from_quaternion, euler_matrix
 import cv2
 import message_filters
+import os
+import sys
 
-import image_geometry  # for PinholeCameraModel
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(BASE_DIR)
+
+from scripts.ImageProcessing.Tracking import AnalyzeFrame
 
 TOPIC_CAMERA = "/camera/color/image_raw/compressed"
 TOPIC_FRUIT_DETECTIONS = "/fruit_detections"
@@ -52,6 +57,7 @@ class MainNode:
         self._gps_position_id: int = 0
         self._image_lidar_points: np.ndarray = None
         self._image_lidar_points_v2: np.ndarray = None
+        self._image_detection: np.ndarray = None
         self._imu_data: Imu = None
         self._imu_rpy_initial: np.ndarray = None
         self._imu_rpy_current: np.ndarray = None
@@ -65,6 +71,7 @@ class MainNode:
         self._lidar_rotated_id: int = 0
         self._rate = rospy.Rate(frequency)
 
+        self._analyzer = AnalyzeFrame()
         # Sensors' poses
         self._camera_intrinsics = np.array(
             [
@@ -95,7 +102,6 @@ class MainNode:
         self._pub_image_lidar_points_v2 = rospy.Publisher(
             TOPIC_IMAGE_LIDAR_POINTS_V2, Image, queue_size=1
         )
-
 
         # ROS subscribers
         # rospy.Subscriber(TOPIC_CAMERA, CompressedImage, self._clb_camera)
@@ -130,33 +136,36 @@ class MainNode:
         self._camera_image = self._cv_bridge.compressed_imgmsg_to_cv2(msg)
 
         # Undistort the image
-        # camera_matrix = np.array(
-        #     [
-        #         [672.0395020303501, 0.0, 642.4371572558833],
-        #         [0.0, 313.0419989351929, 232.20148718757312],
-        #         [0.0, 0.0, 1.0],
-        #     ],
-        #     dtype=np.float32,
-        # )
-        # dist_coeffs = np.array(
-        #     [
-        #         -0.732090958418714,
-        #         0.8017114744356094,
-        #         0.05425622628568444,
-        #         0.0011515109968409918,
-        #     ],
-        #     dtype=np.float32,
-        # )
-        # dist_coeffs = np.array(
-        #     [0.0, 0.0, 0.0, 0.0],
-        #     dtype=np.float32,
-        # )
-        # new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(
-        #     camera_matrix, dist_coeffs, (640, 480), 1, (640, 480)
-        # )
-        # self._camera_image = cv2.undistort(
-        #     distorted_img, camera_matrix, dist_coeffs, None, new_camera_matrix
-        # )
+        """
+        camera_matrix = np.array(
+            [
+                [672.0395020303501, 0.0, 642.4371572558833],
+                [0.0, 313.0419989351929, 232.20148718757312],
+                [0.0, 0.0, 1.0],
+            ],
+            dtype=np.float32,
+        )
+        dist_coeffs = np.array(
+            [
+                -0.732090958418714,
+                0.8017114744356094,
+                0.05425622628568444,
+                0.0011515109968409918,
+            ],
+            dtype=np.float32,
+        )
+        dist_coeffs = np.array(
+            [0.0, 0.0, 0.0, 0.0],
+            dtype=np.float32,
+        )
+        new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(
+            camera_matrix, dist_coeffs, (640, 480), 1, (640, 480)
+        )
+        self._camera_image = cv2.undistort(
+            distorted_img, camera_matrix, dist_coeffs, None, new_camera_matrix
+        )
+        """
+
         # self.publish_fruit_detections()
 
     def _clb_gps(self, msg: NavSatFix):
@@ -230,11 +239,11 @@ class MainNode:
                 self._imu_data.orientation.w,
             ]
         )
-        rospy.loginfo(
-            f"Roll: {self.rad2degree(self._imu_rpy_current[0]):.2f}, "
-            f"Pitch: {self.rad2degree(self._imu_rpy_current[1]):.2f}, "
-            f"Yaw: {self.rad2degree(self._imu_rpy_current[2]):.2f}"
-        )
+        # rospy.loginfo(
+        #     f"Roll: {self.rad2degree(self._imu_rpy_current[0]):.2f}, "
+        #     f"Pitch: {self.rad2degree(self._imu_rpy_current[1]):.2f}, "
+        #     f"Yaw: {self.rad2degree(self._imu_rpy_current[2]):.2f}"
+        # )
 
         self._current_rpy = np.array(self._imu_rpy_current) - np.array(
             self._imu_rpy_initial
@@ -397,7 +406,7 @@ class MainNode:
         # calculate half size of image
         mean_distance_lidar = np.mean(distance_x)
 
-        print(f"Mean distance: {mean_distance_lidar}")
+        # print(f"Mean distance: {mean_distance_lidar}")
         distance_lidar = mean_distance_lidar / 0.5
         image_lidar_data = front_lidar_data[
             np.logical_and(
@@ -447,6 +456,14 @@ class MainNode:
         if self._camera_image is None:
             return np.zeros((480, 640, 3), dtype=np.uint8)
         return self._camera_image
+
+    def get_image_detection(self):
+        """Get the image detection."""
+
+        image = self.get_camera_image()
+        self._image_detection = self._analyzer.analizer(image)
+
+        return self._image_detection
 
     def get_fruit_localization(self):
         """Get localization of fruit based on image and lidar."""
@@ -501,8 +518,9 @@ class MainNode:
 
     def publish_fruit_detections(self):
         """Publish the fruit detections in the image."""
-        camera_image = self.get_camera_image().copy()
-        msg = self._cv_bridge.cv2_to_imgmsg(camera_image, "bgr8")
+        # camera_image = self.get_camera_image().copy()
+        image_detection = self.get_image_detection()
+        msg = self._cv_bridge.cv2_to_imgmsg(image_detection, "bgr8")
         self._pub_camera.publish(msg)
 
     def publish_global_map(self):
@@ -593,8 +611,6 @@ class MainNode:
     #         )
     #         self._pub_image_lidar.publish(lidar_cloud)
 
-
-
     def rad2degree(self, radian: float) -> float:
         """Convert radians to degrees.
 
@@ -612,7 +628,7 @@ class MainNode:
 
         while not rospy.is_shutdown():
             self._rate.sleep()
-            # self.publish_fruit_detections()
+            self.publish_fruit_detections()
             # self.publish_global_map()
             # self.get_fruit_localization()
             self.publish_image_lidar_points()
