@@ -92,9 +92,34 @@ class AnalyzeFrame:
         Ai, Bi, G = initialize(self._pattern_yellow, position)
         response_yellow = predict(gray, Ai / Bi)
 
-        features = np.concatenate((image.flatten(), response_red.flatten(),response_yellow.flatten()))
+        features = np.concatenate(
+            (image.flatten(), response_red.flatten(), response_yellow.flatten())
+        )
 
         return features
+
+    def svm_predict(self, predict_data, obj, objects):
+        
+        y_pred = 0
+        color = (0, 0, 0)
+        if predict_data is not None:
+            if predict_data.shape[0] > 0 and predict_data.shape[1] > 0:
+                predict_data = cv2.resize(predict_data, (20, 20))
+                features = self.get_features(predict_data).astype(np.float32)
+
+                _, y_pred = self._svm_classifier.predict(features.reshape(1, -1))
+                y_pred = y_pred[0][0]
+
+        if y_pred == 1: # red
+            color = (0, 255, 255)
+            objects.remove(obj)
+        elif y_pred == 2: # yellow
+            color = (0, 0, 255)
+        elif y_pred == 3: # backgrond
+            color = (0, 0, 0)
+            objects.remove(obj)
+
+        return y_pred, color
 
     def detect_yellow(self, frame):
 
@@ -112,7 +137,9 @@ class AnalyzeFrame:
 
         # Multiply the tophat images
         image_tophat_mult = cv2.multiply(image_hls_s, image_lab_b)
-        image_tophat_mult = cv2.morphologyEx(image_tophat_mult, cv2.MORPH_TOPHAT, kernel)
+        image_tophat_mult = cv2.morphologyEx(
+            image_tophat_mult, cv2.MORPH_TOPHAT, kernel
+        )
 
         # Normalize the image
         # image_tophat_mult_norm = cv2.normalize(image_tophat_mult, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
@@ -122,7 +149,10 @@ class AnalyzeFrame:
 
         # Binarize the image
         image_bin = image_tophat_mult > 20000
-        image_bin = np.logical_or(np.logical_and(image_bin,mask),  mask)
+        image_bin = np.logical_or(np.logical_and(image_bin, mask), mask)
+
+        # Median filter
+        image_bin = cv2.medianBlur(image_bin.astype("uint8"), 5)
 
         # Track objects using the CSRT tracker
         for obj in self.trackedObjects_yellow.copy():
@@ -144,21 +174,27 @@ class AnalyzeFrame:
         for obj in self.trackedObjects_yellow:
             x, y, w, h = obj.bbox
             x, y, w, h = int(x), int(y), int(w), int(h)
-            image_bin[y:y+h, x:x+w] = 0
+            image_bin[y : y + h, x : x + w] = 0
 
         # Display the binarized image
         # cv2.imshow('Tracked removed binary', image_bin.astype('uint8') * 255)
 
         # Perform CCL and filter small objects
-        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(image_bin.astype('uint8'), connectivity=8)
+        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+            image_bin.astype("uint8"), connectivity=8
+        )
 
         # Intersection over Union tracking
         for i in range(1, num_labels):
             if stats[i, cv2.CC_STAT_AREA] < 10:
                 continue
 
-            x, y, w, h = stats[i, cv2.CC_STAT_LEFT], stats[i, cv2.CC_STAT_TOP], stats[i, cv2.CC_STAT_WIDTH], stats[
-                i, cv2.CC_STAT_HEIGHT]
+            x, y, w, h = (
+                stats[i, cv2.CC_STAT_LEFT],
+                stats[i, cv2.CC_STAT_TOP],
+                stats[i, cv2.CC_STAT_WIDTH],
+                stats[i, cv2.CC_STAT_HEIGHT],
+            )
             bbox = (x, y, w, h)
             x_c = centroids[i, 0]
             y_c = centroids[i, 1]
@@ -223,9 +259,13 @@ class AnalyzeFrame:
                 bestTrackedObj.visible = True
                 bestTrackedObj.invisibleCounter = 0
                 bestTrackedObj.visibleCounter += 1
-                bestTrackedObj.tracker = self.initializecorrfilter(frame, int(bestTrackedObj.x), int(bestTrackedObj.y))
+                bestTrackedObj.tracker = self.initializecorrfilter(
+                    frame, int(bestTrackedObj.x), int(bestTrackedObj.y)
+                )
             else:
-                obj = ObjectParameters(self.ID_yellow, tempObj.bbox, tempObj.x, tempObj.y, tempObj.area)
+                obj = ObjectParameters(
+                    self.ID_yellow, tempObj.bbox, tempObj.x, tempObj.y, tempObj.area
+                )
                 self.objects_yellow.append(obj)
                 self.ID_yellow += 1
                 # print('New object added with ID:', obj.id)
@@ -253,53 +293,62 @@ class AnalyzeFrame:
                 continue
             x, y, w, h = obj.bbox
             x, y, w, h = int(x), int(y), int(w), int(h)
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 1)
-            cv2.putText(frame, str(obj.id), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+
+            predict_data = frame[y : y + h, x : x + w]
+            y_pred, color = self.svm_predict(predict_data, obj, self.objects_yellow)
+
+            if obj.visible and y_pred == 2:
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 1)
+                cv2.putText(
+                    frame,
+                    str(obj.id),
+                    (x, y),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (0, 255, 0),
+                    1,
+                )
 
         # Display the frame with tracked objects
         for obj in self.trackedObjects_yellow:
             x, y, w, h = obj.bbox
             x, y, w, h = int(x), int(y), int(w), int(h)
 
-            # predict_data = frame[y:y+h, x:x+w]
-            # if predict_data is not None:
-            #     if predict_data.shape[0] > 0 and predict_data.shape[1] > 0:
-            #         predict_data = cv2.resize(predict_data, (20, 20))
-            #         features= get_features(predict_data).astype(np.float32)
+            predict_data = frame[y : y + h, x : x + w]
+            y_pred, color = self.svm_predict(predict_data, obj, self.trackedObjects_yellow)
 
-            #         print("features", features)
-            #         print(features.shape)
-            #         _, y_pred =  _svm_classifier.predict(features.reshape(1,-1))
-
-            #         y_pred = y_pred[0][0]
-
-            #         print("Object ID:", obj.id)
-            #         print("Coords", x, y)
-            #         print("Predicted class:", y_pred)
-
+            if obj.visible and y_pred == 2:
+                cv2.rectangle(frame, (x, y), (x + w, y + h), color, 1)
+                cv2.putText(
+                    frame,
+                    str(obj.id),
+                    (x, y),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (0, 0, 255),
+                    1,
+                )
 
 
-            if obj.visible:
-                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 1)
-                cv2.putText(frame, str(obj.id), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+        return frame
 
-            return frame
-    
     def detect_red(self, frame):
 
         image_luv = cv2.cvtColor(frame, cv2.COLOR_BGR2Luv)
         image_luv_l, image_luv_u, image_luv_v = cv2.split(image_luv)
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
         image_tophat_luv_u = cv2.morphologyEx(image_luv_u, cv2.MORPH_TOPHAT, kernel)
-        
+
         # Normalize the image
-        image_tophat_luv_u_norm = cv2.normalize(image_tophat_luv_u, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
+        image_tophat_luv_u_norm = cv2.normalize(
+            image_tophat_luv_u, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U
+        )
 
         # Binarize the image
         image_bin = image_tophat_luv_u > 10
 
         # Median filter
-        image_bin = cv2.medianBlur(image_bin.astype('uint8'), 5)
+        image_bin = cv2.medianBlur(image_bin.astype("uint8"), 5)
 
         # Track objects using the CSRT tracker
         for obj in self.trackedObjects_red.copy():
@@ -321,18 +370,24 @@ class AnalyzeFrame:
         for obj in self.trackedObjects_red:
             x, y, w, h = obj.bbox
             x, y, w, h = int(x), int(y), int(w), int(h)
-            image_bin[y:y+h, x:x+w] = 0
+            image_bin[y : y + h, x : x + w] = 0
 
         # Perform CCL and filter small objects
-        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(image_bin.astype('uint8'), connectivity=8)
+        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+            image_bin.astype("uint8"), connectivity=8
+        )
 
         # Intersection over Union tracking
         for i in range(1, num_labels):
             if stats[i, cv2.CC_STAT_AREA] < 10:
                 continue
 
-            x, y, w, h = stats[i, cv2.CC_STAT_LEFT], stats[i, cv2.CC_STAT_TOP], stats[i, cv2.CC_STAT_WIDTH], stats[
-                i, cv2.CC_STAT_HEIGHT]
+            x, y, w, h = (
+                stats[i, cv2.CC_STAT_LEFT],
+                stats[i, cv2.CC_STAT_TOP],
+                stats[i, cv2.CC_STAT_WIDTH],
+                stats[i, cv2.CC_STAT_HEIGHT],
+            )
             bbox = (x, y, w, h)
             x_c = centroids[i, 0]
             y_c = centroids[i, 1]
@@ -397,13 +452,17 @@ class AnalyzeFrame:
                 bestTrackedObj.visible = True
                 bestTrackedObj.invisibleCounter = 0
                 bestTrackedObj.visibleCounter += 1
-                bestTrackedObj.tracker = self.initializecorrfilter(frame, int(bestTrackedObj.x), int(bestTrackedObj.y))
+                bestTrackedObj.tracker = self.initializecorrfilter(
+                    frame, int(bestTrackedObj.x), int(bestTrackedObj.y)
+                )
 
             else:
-                obj = ObjectParameters(self.ID_red, tempObj.bbox, tempObj.x, tempObj.y, tempObj.area)
+                obj = ObjectParameters(
+                    self.ID_red, tempObj.bbox, tempObj.x, tempObj.y, tempObj.area
+                )
                 self.objects_red.append(obj)
                 self.ID_red += 1
-                print('New object added with ID:', obj.id)
+                # print("New object added with ID:", obj.id)
 
         self.tempObjects_red.clear()
 
@@ -426,15 +485,40 @@ class AnalyzeFrame:
                 continue
             x, y, w, h = obj.bbox
             x, y, w, h = int(x), int(y), int(w), int(h)
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 1)
-            cv2.putText(frame, str(obj.id), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+
+            predict_data = frame[y : y + h, x : x + w]
+            y_pred, color = self.svm_predict(predict_data, obj, self.objects_red)
+
+            if obj.visible and y_pred == 1:
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 1)
+                cv2.putText(
+                    frame,
+                    str(obj.id),
+                    (x, y),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (0, 255, 0),
+                    1,
+                )
 
         # Display the frame with tracked objects
         for obj in self.trackedObjects_red:
             x, y, w, h = obj.bbox
             x, y, w, h = int(x), int(y), int(w), int(h)
-            if obj.visible:
+
+            predict_data = frame[y : y + h, x : x + w]
+            y_pred, color = self.svm_predict(predict_data, obj, self.trackedObjects_red)
+
+            if obj.visible and y_pred == 1:
                 cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 1)
-                cv2.putText(frame, str(obj.id), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+                cv2.putText(
+                    frame,
+                    str(obj.id),
+                    (x, y),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (0, 0, 255),
+                    1,
+                )
 
         return frame
