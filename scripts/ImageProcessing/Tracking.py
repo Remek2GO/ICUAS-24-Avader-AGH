@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import cv2
 from dataclasses import dataclass
+import numpy as np
 
 
 @dataclass
@@ -57,7 +58,16 @@ class AnalyzeFrame:
 
     def analizer(self, frame):
         image_luv = cv2.cvtColor(frame, cv2.COLOR_BGR2Luv)
+        img = frame.copy()  
         image_luv_l, image_luv_u, image_luv_v = cv2.split(image_luv)
+        YCBCR = cv2.cvtColor(frame, cv2.COLOR_BGR2YCrCb)
+        Y, Cr, Cb = cv2.split(YCBCR)
+
+
+        image2 = np.uint32(image_luv_u)*np.uint32(~Cb)
+        image2_vis = np.uint8(image2/np.max(image2) * 255)
+
+
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
         image_tophat_luv_u = cv2.morphologyEx(image_luv_u, cv2.MORPH_TOPHAT, kernel)
         # image_tophat_luv_u = cv2.GaussianBlur(image_tophat_luv_u, (17, 17), 0)
@@ -246,4 +256,4 @@ class AnalyzeFrame:
         # rospy.loginfo("Red count: ")
         # cv2.imshow('Bounding Box', frame)
         self.frame = frame
-        return frame
+        return frame, image_tophat_luv_u, img, image_bin

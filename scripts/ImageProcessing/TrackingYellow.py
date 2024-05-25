@@ -54,7 +54,7 @@ trackedObjects = []
 ID = 1
 
 # Read the video stream
-video = cv2.VideoCapture('real_video/ICUAS_bag_1_camera_color_image_raw_compressed.mp4')
+video = cv2.VideoCapture('bags/ICUAS_bag_1_camera_color_image_raw_compressed.mp4')
 
 # Read the first frame
 ret, frame = video.read()
@@ -114,6 +114,7 @@ while ret:
     # Remove the tracked pixels from the image_bin
     for obj in trackedObjects:
         x, y, w, h = obj.bbox
+        x, y, w, h = int(x), int(y), int(w), int(h)
         image_bin[y:y+h, x:x+w] = 0
 
     # Display the binarized image
@@ -222,12 +223,14 @@ while ret:
         if not obj.visible:
             continue
         x, y, w, h = obj.bbox
+        x, y, w, h = int(x), int(y), int(w), int(h)
         cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 1)
         cv2.putText(frame, str(obj.id), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
     # Display the frame with tracked objects
     for obj in trackedObjects:
         x, y, w, h = obj.bbox
+        x, y, w, h = int(x), int(y), int(w), int(h)
         if obj.visible:
             cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 1)
             cv2.putText(frame, str(obj.id), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)

@@ -55,7 +55,7 @@ trackedObjects = []
 ID = 1
 
 # Read the video stream
-video = cv2.VideoCapture('real_video/ICUAS_bag_1_camera_color_image_raw_compressed.mp4')
+video = cv2.VideoCapture('/home/vision/Documents/Repositorium/icuas24_avader/bags/ICUAS_bag_1_camera_color_image_raw_compressed.mp4')
 
 # Read the first frame
 ret, frame = video.read()
