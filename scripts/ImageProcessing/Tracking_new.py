@@ -33,7 +33,8 @@ class AnalyzeFrame:
         self.objects_red = []
         self.trackedObjects_red = []
 
-        self.ID = 1
+        self.ID_red = 1
+        self.ID_yellow = 1
         self.frame = None
         self.yellow_count = 0
         self.red_count = 0
@@ -224,9 +225,9 @@ class AnalyzeFrame:
                 bestTrackedObj.visibleCounter += 1
                 bestTrackedObj.tracker = self.initializecorrfilter(frame, int(bestTrackedObj.x), int(bestTrackedObj.y))
             else:
-                obj = ObjectParameters(ID, tempObj.bbox, tempObj.x, tempObj.y, tempObj.area)
+                obj = ObjectParameters(self.ID_yellow, tempObj.bbox, tempObj.x, tempObj.y, tempObj.area)
                 self.objects_yellow.append(obj)
-                ID += 1
+                self.ID_yellow += 1
                 # print('New object added with ID:', obj.id)
 
         self.tempObjects_yellow.clear()
@@ -399,9 +400,9 @@ class AnalyzeFrame:
                 bestTrackedObj.tracker = self.initializecorrfilter(frame, int(bestTrackedObj.x), int(bestTrackedObj.y))
 
             else:
-                obj = ObjectParameters(ID, tempObj.bbox, tempObj.x, tempObj.y, tempObj.area)
+                obj = ObjectParameters(self.ID_red, tempObj.bbox, tempObj.x, tempObj.y, tempObj.area)
                 self.objects_red.append(obj)
-                ID += 1
+                self.ID_red += 1
                 print('New object added with ID:', obj.id)
 
         self.tempObjects_red.clear()
