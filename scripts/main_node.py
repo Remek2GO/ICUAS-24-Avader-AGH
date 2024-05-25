@@ -516,6 +516,19 @@ class MainNode:
 
         return np.array([x_imu, y_imu, z_imu])
 
+    def process_image(self):
+        """Process the image."""
+        image = self.get_camera_image()
+
+        # Image segmentation to get fruits
+        # TODO
+
+        # CCL to find the exact location of the fruits
+        # TODO
+
+        # Use SVM to check if the detected object is a fruit
+        # TODO
+
     def publish_fruit_detections(self):
         """Publish the fruit detections in the image."""
         # camera_image = self.get_camera_image().copy()
