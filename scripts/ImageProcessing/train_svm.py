@@ -131,8 +131,8 @@ def read_images_flatten(directory, files):
     N = len(files)
     images = np.zeros((N, 11*400))
 
-    pattern_red = cv2.imread("/root/sim_ws/src/icuas24_competition/scripts/svm_images/red_00013.png")
-    pattern_yellow = cv2.imread("/root/sim_ws/src/icuas24_competition/scripts/svm_images/yellow_00013.png")
+    pattern_red = cv2.imread("/root/sim_ws/src/icuas24_competition/scripts/ImageProcessing/pattern_red2.png")
+    pattern_yellow = cv2.imread("/root/sim_ws/src/icuas24_competition/scripts/ImageProcessing/pattern_yellow2.png")
     pattern_red = cv2.cvtColor(pattern_red, cv2.COLOR_BGR2GRAY)
     pattern_yellow = cv2.cvtColor(pattern_yellow, cv2.COLOR_BGR2GRAY)
     
@@ -165,15 +165,17 @@ def read_images_flatten(directory, files):
         position = [0,0, 20, 20]
         Ai, Bi, G = initialize(pattern_red, position)
         response_red = predict(init_img, Ai/Bi)
-
+        # print(response_red.max())
         # cv2.imshow("response_red", response_red)
 
         Ai, Bi, G = initialize(pattern_yellow, position)
         response_yellow = predict(init_img, Ai/Bi)
+        # print(response_yellow.max())
         # cv2.imshow("response_yellow", response_yellow)
 
-        # images[it,:] = np.concatenate((image.flatten(), u.flatten(),v.flatten(), a.flatten(), b.flatten(), cr.flatten(), cb.flatten(), canny.flatten()))
-        images[it,:] = np.concatenate((image.flatten(), u.flatten(),v.flatten(), a.flatten(), b.flatten(), cr.flatten(), cb.flatten(),response_red.flatten(),response_yellow.flatten()))
+        images[it,:] = np.concatenate((image.flatten(), u.flatten(),v.flatten(), a.flatten(), b.flatten(), cr.flatten(), cb.flatten(), response_red.flatten(),response_yellow.flatten()))
+        # images[it,:] = np.concatenate((image.flatten(),response_red.flatten(),response_yellow.flatten()))
+        # images[it,:] = np.concatenate((image.flatten(),response_red.flatten(),response_yellow.flatten()))
 
         # cv2.imshow("Image", image)
         # cv2.imshow("l", l)
@@ -281,51 +283,66 @@ X_test = scaler.transform(X_test)
 clf = svm.SVC()
 clf.fit(X_train, y_train)
 
-# predict
-y_pred = clf.predict(X_test)
+svm_classifier = cv2.ml.SVM_create()
+svm_classifier.setKernel(cv2.ml.SVM_LINEAR)
+svm_classifier.setType(cv2.ml.SVM_C_SVC)
 
-# accuracy
+svm_classifier.train(np.float32(X_train), cv2.ml.ROW_SAMPLE, np.int32(y_train))
+
+# predict using OpenCV's SVM
+_, y_pred = svm_classifier.predict(np.float32(X_test))
 accuracy = accuracy_score(y_test, y_pred)
 print("Accuracy: ", accuracy)
 
-# save model
-filename = "svm_model_rgb.sav"
-pickle.dump(clf, open(filename, "wb"))
+# predict
+# y_pred = clf.predict(X_test)
+
+# # accuracy
+# accuracy = accuracy_score(y_test, y_pred)
+# print("Accuracy: ", accuracy)
+
+# # save model
+# filename = "svm_model_rgb.sav"
+# pickle.dump(clf, open(filename, "wb"))
 
 # display test results
 # print("Test results")
 # print("True labels: ", y_test)
 # print("Predicted labels: ", y_pred)
 
-detect_diff = y_test - y_pred
+detect_diff = y_test - y_pred.reshape(-1)
 print("Detection errors: ", np.where(detect_diff != 0)[0])
 
 # display images
-for i in np.where(detect_diff != 0)[0]:
-    if y_test[i] == 1:
-        print("True label: red")
-    elif y_test[i] == 2:
-        print("True label: yellow")
-    elif y_test[i] == 3:
-        print("True label: none")
+# for i in np.where(detect_diff != 0)[0]:
+#     if y_test[i] == 1:
+#         print("True label: red")
+#     elif y_test[i] == 2:
+#         print("True label: yellow")
+#     elif y_test[i] == 3:
+#         print("True label: none")
 
-    if y_pred[i] == 1:
-        print("Predicted label: red")
-    elif y_pred[i] == 2:
-        print("Predicted label: yellow")
-    elif y_pred[i] == 3:
-        print("Predicted label: none")
+#     if y_pred[i] == 1:
+#         print("Predicted label: red")
+#     elif y_pred[i] == 2:
+#         print("Predicted label: yellow")
+#     elif y_pred[i] == 3:
+#         print("Predicted label: none")
 
-    print("Image:")
-    if y_test[i] == 1:
-        cv2.imshow("Image", red_images_flatten[i][:3*400].reshape(20,20,3).astype(np.uint8))
-    elif y_test[i] == 2:
-        cv2.imshow("Image", yellow_images_flatten[i][:3*400].reshape(20,20,3).astype(np.uint8))
-    elif y_test[i] == 3:
-        cv2.imshow("Image", none_images_flatten[i][:3*400].reshape(20,20,3).astype(np.uint8))
-    cv2.waitKey(1)
+#     print("Image:")
+#     if y_test[i] == 1:
+#         cv2.imshow("Image", red_images_flatten[i][:3*400].reshape(20,20,3).astype(np.uint8))
+#     elif y_test[i] == 2:
+#         cv2.imshow("Image", yellow_images_flatten[i][:3*400].reshape(20,20,3).astype(np.uint8))
+#     elif y_test[i] == 3:
+#         cv2.imshow("Image", none_images_flatten[i][:3*400].reshape(20,20,3).astype(np.uint8))
+#     cv2.waitKey(1)
 
-cv2.destroyAllWindows()
+# cv2.destroyAllWindows()
+
+#save model
+svm_classifier.save("svm_model_cv4.xml")
+
 
 
 
