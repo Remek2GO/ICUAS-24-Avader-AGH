@@ -4,11 +4,12 @@ from dataclasses import dataclass
 import numpy as np
 import os
 import sys
+import copy
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
-from scripts.ImageProcessing.dcf import initialize, predict
+# from scripts.ImageProcessing.dcf import initialize, predict
 
 
 @dataclass
@@ -46,7 +47,7 @@ class AnalyzeFrame:
             cv2.IMREAD_GRAYSCALE,
         )
         self._pattern_yellow = cv2.imread(
-            "/root/sim_ws/src/icuas24_competition/scripts/ImageProcessing//pattern_yellow.png",
+            "/root/sim_ws/src/icuas24_competition/scripts/ImageProcessing/pattern_yellow.png",
             cv2.IMREAD_GRAYSCALE,
         )
 
@@ -99,7 +100,7 @@ class AnalyzeFrame:
         return features
 
     def svm_predict(self, predict_data, obj, objects):
-        
+
         y_pred = 0
         color = (0, 0, 0)
         if predict_data is not None:
@@ -110,12 +111,12 @@ class AnalyzeFrame:
                 _, y_pred = self._svm_classifier.predict(features.reshape(1, -1))
                 y_pred = y_pred[0][0]
 
-        if y_pred == 1: # red
+        if y_pred == 1:  # red
             color = (0, 255, 255)
             objects.remove(obj)
-        elif y_pred == 2: # yellow
+        elif y_pred == 2:  # yellow
             color = (0, 0, 255)
-        elif y_pred == 3: # backgrond
+        elif y_pred == 3:  # backgrond
             color = (0, 0, 0)
             objects.remove(obj)
 
@@ -155,7 +156,7 @@ class AnalyzeFrame:
         image_bin = cv2.medianBlur(image_bin.astype("uint8"), 5)
 
         # Track objects using the CSRT tracker
-        for obj in self.trackedObjects_yellow.copy():
+        for obj in copy.deepcopy(self.trackedObjects_yellow):
             success, bbox = obj.tracker.update(frame)
             if success:
                 obj.bbox = bbox
@@ -204,6 +205,7 @@ class AnalyzeFrame:
             obj = ObjectParameters(i, bbox, x_c, y_c, area)
 
             self.tempObjects_yellow.append(obj)
+        return self.tempObjects_yellow
 
         # Set all objects to invisible
         for obj in self.objects_yellow:
@@ -273,19 +275,24 @@ class AnalyzeFrame:
         self.tempObjects_yellow.clear()
 
         # Analyse non-visible objects
-        for obj in self.objects_yellow.copy():
+        for obj in copy.deepcopy(self.objects_yellow):
             if not obj.visible:
                 obj.invisibleCounter += 1
                 if obj.invisibleCounter > 50:
                     self.objects_yellow.remove(obj)
 
-        for obj in self.objects_yellow.copy():
+        for obj in copy.deepcopy(self.objects_yellow):
             # print('Object with ID:', obj.id, 'is visible for', obj.visibleCounter, 'frames')
             if obj.visibleCounter > 10:
                 obj.tracker = self.initializecorrfilter(frame, int(obj.x), int(obj.y))
                 self.trackedObjects_yellow.append(obj)
                 self.objects_yellow.remove(obj)
                 # print('Object with ID:', obj.id, 'is now tracked')
+
+        # Return the visual objects
+        visual_yellow = [obj for obj in self.objects_yellow]
+        visual_yellow.extend(self.trackedObjects_yellow)
+        return visual_yellow
 
         # Display the frame with potential objects
         for obj in self.objects_yellow:
@@ -315,7 +322,9 @@ class AnalyzeFrame:
             x, y, w, h = int(x), int(y), int(w), int(h)
 
             predict_data = frame[y : y + h, x : x + w]
-            y_pred, color = self.svm_predict(predict_data, obj, self.trackedObjects_yellow)
+            y_pred, color = self.svm_predict(
+                predict_data, obj, self.trackedObjects_yellow
+            )
 
             if obj.visible and y_pred == 2:
                 cv2.rectangle(frame, (x, y), (x + w, y + h), color, 1)
@@ -328,7 +337,6 @@ class AnalyzeFrame:
                     (0, 0, 255),
                     1,
                 )
-
 
         return frame
 
@@ -351,7 +359,7 @@ class AnalyzeFrame:
         image_bin = cv2.medianBlur(image_bin.astype("uint8"), 5)
 
         # Track objects using the CSRT tracker
-        for obj in self.trackedObjects_red.copy():
+        for obj in copy.deepcopy(self.trackedObjects_red):
             success, bbox = obj.tracker.update(frame)
             if success:
                 obj.bbox = bbox
@@ -397,6 +405,8 @@ class AnalyzeFrame:
             obj = ObjectParameters(i, bbox, x_c, y_c, area)
 
             self.tempObjects_red.append(obj)
+
+        return self.tempObjects_red
 
         # Set all objects to invisible
         for obj in self.objects_red:
@@ -467,17 +477,22 @@ class AnalyzeFrame:
         self.tempObjects_red.clear()
 
         # Analyse non-visible objects
-        for obj in self.objects_red.copy():
+        for obj in copy.deepcopy(self.objects_red):
             if not obj.visible:
                 obj.invisibleCounter += 1
                 if obj.invisibleCounter > 50:
                     self.objects_red.remove(obj)
 
-        for obj in self.objects_red.copy():
+        for obj in copy.deepcopy(self.objects_red):
             if obj.visibleCounter > 10:
                 obj.tracker = self.initializecorrfilter(frame, int(obj.x), int(obj.y))
                 self.trackedObjects_red.append(obj)
                 self.objects_red.remove(obj)
+
+        # Return the visual objects
+        visual_red = [obj for obj in self.objects_red]
+        visual_red.extend(self.trackedObjects_red)
+        return visual_red
 
         # Display the frame with potential objects
         for obj in self.objects_red:

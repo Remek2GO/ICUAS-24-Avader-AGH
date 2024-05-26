@@ -11,19 +11,22 @@ from collections import deque
 from geometry_msgs.msg import PointStamped
 from sensor_msgs import point_cloud2
 from sensor_msgs.msg import CompressedImage, NavSatFix, Image, Imu, PointCloud2
-from std_msgs.msg import Header
+from std_msgs.msg import Header, Int32
 from tf.transformations import euler_from_quaternion, euler_matrix
-import cv2
 import message_filters
+from typing import List, Tuple
+
 import os
 import sys
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
-from scripts.ImageProcessing.Tracking import AnalyzeFrame
+from scripts.ImageProcessing.Tracking_new import AnalyzeFrame, ObjectParameters
 
 TOPIC_CAMERA = "/camera/color/image_raw/compressed"
+TOPIC_FRUIT_COUNT_RED = "/red_fruit_count"
+TOPIC_FRUIT_COUNT_YELLOW = "/yellow_fruit_count"
 TOPIC_FRUIT_DETECTIONS = "/fruit_detections"
 TOPIC_GLOBAL_MAP = "/global_map"
 TOPIC_GPS = "/hawkblue/mavros/global_position/global"
@@ -38,6 +41,8 @@ EARTH_RADIUS = 6378137.0
 E2 = 6.69437999014e-3  # eccentricity, WGS84
 G = 9.81  # gravity acceleration, m/s^2
 LIDAR_FRAME_WINDOW = 10
+N_CLOSEST_POINTS = 5
+NEW_FRUIT_PROXIMITY_THRESHOLD = 0.1  # meters
 
 
 class MainNode:
@@ -49,6 +54,9 @@ class MainNode:
         self._cv_bridge = CvBridge()
         self._current_pose: np.ndarray = None
         self._current_rpy: np.ndarray = None
+        self._fruits_xyz: np.ndarray = None
+        self._fruits_red_count: int = 0
+        self._fruits_yellow_count: int = 0
         self._global_map: deque = deque([], maxlen=LIDAR_FRAME_WINDOW)
         self._global_map_id: int = 0
         self._gps_data: NavSatFix = None
@@ -57,7 +65,6 @@ class MainNode:
         self._gps_position_id: int = 0
         self._image_lidar_points: np.ndarray = None
         self._image_lidar_points_v2: np.ndarray = None
-        self._image_detection: np.ndarray = None
         self._imu_data: Imu = None
         self._imu_rpy_initial: np.ndarray = None
         self._imu_rpy_current: np.ndarray = None
@@ -67,11 +74,14 @@ class MainNode:
         self._lidar_header: Header = None
         self._lidar_intensity: float = None
         self._lidar_points: np.ndarray = None
+        self._lidar_points_distances: np.ndarray = None
         self._lidar_ring: int = None
         self._lidar_rotated_id: int = 0
+        self._points_on_2d: np.ndarray = None
         self._rate = rospy.Rate(frequency)
 
         self._analyzer = AnalyzeFrame()
+
         # Sensors' poses
         self._camera_intrinsics = np.array(
             [
@@ -83,9 +93,17 @@ class MainNode:
         )
         self._lidar_pose = euler_matrix(np.pi, np.pi / 18, 0)[:3, :3]
         self._lidar_translation = np.array([0.083, 0.0, 0.126])
+        self._lidar_in_imu_coords = np.array([0.067, 0.0, -0.246])
+        self._camera_in_imu_coords = np.array([0.15, 0.0, -0.12])
 
         # ROS publishers
         self._pub_camera = rospy.Publisher(TOPIC_FRUIT_DETECTIONS, Image, queue_size=1)
+        self._pub_red_fruit_count = rospy.Publisher(
+            TOPIC_FRUIT_COUNT_RED, Int32, queue_size=1
+        )
+        self._pub_yellow_fruit_count = rospy.Publisher(
+            TOPIC_FRUIT_COUNT_YELLOW, Int32, queue_size=1
+        )
         self._pub_global_map = rospy.Publisher(
             TOPIC_GLOBAL_MAP, PointCloud2, queue_size=1
         )
@@ -95,7 +113,6 @@ class MainNode:
         self._pub_imu_position = rospy.Publisher(
             TOPIC_IMU_POSITION, PointStamped, queue_size=1
         )
-
         self._pub_image_lidar_points = rospy.Publisher(
             TOPIC_IMAGE_LIDAR_POINTS, Image, queue_size=1
         )
@@ -105,68 +122,41 @@ class MainNode:
 
         # ROS subscribers
         # rospy.Subscriber(TOPIC_CAMERA, CompressedImage, self._clb_camera)
-        rospy.Subscriber(TOPIC_GPS, NavSatFix, self._clb_gps)
-        rospy.Subscriber(TOPIC_IMU, Imu, self._clb_imu)
+        # rospy.Subscriber(TOPIC_GPS, NavSatFix, self._clb_gps)
+        # rospy.Subscriber(TOPIC_IMU, Imu, self._clb_imu)
         # rospy.Subscriber(TOPIC_LIDAR, PointCloud2, self._clb_lidar)
 
         # MW: Synchro TEST
-        # gps_sub = message_filters.Subscriber(TOPIC_GPS, NavSatFix)
+        gps_sub = message_filters.Subscriber(TOPIC_GPS, NavSatFix)
         image_sub = message_filters.Subscriber(TOPIC_CAMERA, CompressedImage)
         lidar_sub = message_filters.Subscriber(TOPIC_LIDAR, PointCloud2)
-        # imu_sub = message_filters.Subscriber(TOPIC_IMU, Imu)
+        imu_sub = message_filters.Subscriber(TOPIC_IMU, Imu)
 
         self._time_synchronizer = message_filters.ApproximateTimeSynchronizer(
-            [lidar_sub, image_sub], 10, 0.1, allow_headerless=False
+            [lidar_sub, image_sub, imu_sub, gps_sub], 10, 0.1, allow_headerless=False
         )
         self._time_synchronizer.registerCallback(self._clb_sync)
 
     # MW: Synchro TEST
-    def _clb_sync(self, lidar: PointCloud2, img: CompressedImage):
+    def _clb_sync(
+        self, lidar: PointCloud2, img: CompressedImage, imu: Imu, gps: NavSatFix
+    ):
         """Process the synchronized data."""
-        # self._clb_gps(gps)
+        self._clb_gps(gps)
+        self._clb_imu(imu)
         self._clb_lidar_v2(lidar)
-        self._clb_lidar(lidar)
+        # self._clb_lidar(lidar)
         self._clb_camera(img)
-
-        # rospy.loginfo("Synchronized data received")
+        rospy.loginfo("Synchronized data received")
 
     def _clb_camera(self, msg: CompressedImage):
         """Process the camera image."""
         # distorted_img = self._cv_bridge.compressed_imgmsg_to_cv2(msg)
         self._camera_image = self._cv_bridge.compressed_imgmsg_to_cv2(msg)
 
-        # Undistort the image
-        """
-        camera_matrix = np.array(
-            [
-                [672.0395020303501, 0.0, 642.4371572558833],
-                [0.0, 313.0419989351929, 232.20148718757312],
-                [0.0, 0.0, 1.0],
-            ],
-            dtype=np.float32,
-        )
-        dist_coeffs = np.array(
-            [
-                -0.732090958418714,
-                0.8017114744356094,
-                0.05425622628568444,
-                0.0011515109968409918,
-            ],
-            dtype=np.float32,
-        )
-        dist_coeffs = np.array(
-            [0.0, 0.0, 0.0, 0.0],
-            dtype=np.float32,
-        )
-        new_camera_matrix, _ = cv2.getOptimalNewCameraMatrix(
-            camera_matrix, dist_coeffs, (640, 480), 1, (640, 480)
-        )
-        self._camera_image = cv2.undistort(
-            distorted_img, camera_matrix, dist_coeffs, None, new_camera_matrix
-        )
-        """
-
-        # self.publish_fruit_detections()
+        self.publish_fruit_detections()
+        self.publish_fruit_red_count()
+        self.publish_fruit_yellow_count()
 
     def _clb_gps(self, msg: NavSatFix):
         """Process the GPS data."""
@@ -181,30 +171,30 @@ class MainNode:
 
     def _clb_imu(self, msg: Imu):
         """Process the IMU data."""
-        # Get position from IMU data
-        if self._imu_data is not None:
-            dt = (msg.header.stamp - self._imu_data.header.stamp).to_sec()
-            self._imu_position += self._imu_velocity * dt + 0.5 * (
-                np.array(
-                    [
-                        msg.linear_acceleration.x,
-                        msg.linear_acceleration.y,
-                        msg.linear_acceleration.z - G,
-                    ]
-                )
-                * dt
-                * dt
-            )
-            self._imu_velocity += (
-                np.array(
-                    [
-                        msg.linear_acceleration.x,
-                        msg.linear_acceleration.y,
-                        msg.linear_acceleration.z - G,
-                    ]
-                )
-                * dt
-            )
+        # # Get position from IMU data
+        # if self._imu_data is not None:
+        #     dt = (msg.header.stamp - self._imu_data.header.stamp).to_sec()
+        #     self._imu_position += self._imu_velocity * dt + 0.5 * (
+        #         np.array(
+        #             [
+        #                 msg.linear_acceleration.x,
+        #                 msg.linear_acceleration.y,
+        #                 msg.linear_acceleration.z - G,
+        #             ]
+        #         )
+        #         * dt
+        #         * dt
+        #     )
+        #     self._imu_velocity += (
+        #         np.array(
+        #             [
+        #                 msg.linear_acceleration.x,
+        #                 msg.linear_acceleration.y,
+        #                 msg.linear_acceleration.z - G,
+        #             ]
+        #         )
+        #         * dt
+        # )
 
         # Update IMU data
         self._imu_data = msg
@@ -349,34 +339,28 @@ class MainNode:
 
     def _clb_lidar_v2(self, msg: PointCloud2):
         """Process the LiDAR data."""
-        # Read and
+        # Read lidar point cloud
         gen = point_cloud2.read_points(
             msg, field_names=("x", "y", "z", "intensity", "ring")
         )
-
         points = list(gen)
-        self._lidar_header = msg.header
-        self._lidar_intensity = points[0][3]
+        # self._lidar_header = msg.header
+        # self._lidar_intensity = points[0][3]
+        # self._lidar_points = (
+        #     np.dot(self._lidar_pose, np.array(points)[:, :3].T).T
+        #     + self._lidar_in_imu_coords.T
+        # )
+        # self._lidar_ring = points[0][4]
 
-        # TODO: Is this translation correct?
-        self._lidar_points = np.dot(
-            self._lidar_pose, np.array(points)[:, :3].T
-        ).T + np.dot(self._lidar_pose, self._lidar_translation)
-        self._lidar_ring = points[0][4]
-
-        # Update global map
-        lidar_in_imu_coords = np.array([0.067, 0.0, 0.246])
-
-        if self._imu_rpy_current is not None and self._gps_position is not None:
-            rot_matrix = euler_matrix(
-                self._imu_rpy_current[0],
-                self._imu_rpy_current[1],
-                self._imu_rpy_current[2],
-            )[:3, :3]
-            local_map = np.dot(rot_matrix, self._lidar_points.T).T
-            local_map += lidar_in_imu_coords.T
-            local_map += self._gps_position.T
-            self._global_map.append(local_map)
+        # if self._imu_rpy_current is not None and self._gps_position is not None:
+        #     rot_matrix = euler_matrix(
+        #         self._imu_rpy_current[0],
+        #         self._imu_rpy_current[1],
+        #         self._imu_rpy_current[2],
+        #     )[:3, :3]
+        #     local_map = np.dot(rot_matrix, self._lidar_points.T).T
+        #     local_map += self._gps_position.T
+        #     self._global_map.append(local_map)
 
         # Transform the lidar data to the camera frame
         lidar_rotation = euler_matrix(0.0, -np.pi / 18, 0.0)[:3, :3]
@@ -417,39 +401,42 @@ class MainNode:
 
         lidar_manual = image_lidar_data
 
+        # Save lidar distances
+        self._lidar_points_distances = lidar_manual[:, 0]
+
         # Rotate lidar to camera plane
         # x_plane = y_lidar
         # y_plane = z_lidar
         # z_plane = x_lidar
-        _camera_plane_points = np.zeros((lidar_manual.shape[0], 3))
-        _camera_plane_points[:, 0] = lidar_manual[:, 1]
-        _camera_plane_points[:, 1] = lidar_manual[:, 2]
-        _camera_plane_points[:, 2] = lidar_manual[:, 0]
+        camera_plane_points = np.zeros((lidar_manual.shape[0], 3))
+        camera_plane_points[:, 0] = lidar_manual[:, 1]
+        camera_plane_points[:, 1] = lidar_manual[:, 2]
+        camera_plane_points[:, 2] = lidar_manual[:, 0]
 
         # Normalize camera plane points
-        _camera_plane_points[:, 0] /= _camera_plane_points[:, 2]
-        _camera_plane_points[:, 1] /= _camera_plane_points[:, 2]
-        _camera_plane_points[:, 2] /= _camera_plane_points[:, 2]
+        camera_plane_points[:, 0] /= camera_plane_points[:, 2]
+        camera_plane_points[:, 1] /= camera_plane_points[:, 2]
+        camera_plane_points[:, 2] /= camera_plane_points[:, 2]
 
         # Project the points to the camera image
-        points_on_2d = np.dot(self._camera_intrinsics, _camera_plane_points.T).T
+        self._points_on_2d = np.dot(self._camera_intrinsics, camera_plane_points.T).T
 
         # Lidar points in the camera image
-        camera_img = self.get_camera_image().copy()
-        for point in points_on_2d[:]:
-            # Avoid overflow errors
-            try:
-                camera_img = cv2.circle(
-                    camera_img,
-                    (int(point[0]), int(point[1])),
-                    1,
-                    (255, 0, 0),
-                    -1,
-                )
-            except Exception as e:
-                print(e)
-                pass
-        self._image_lidar_points_v2 = camera_img
+        # camera_img = self.get_camera_image().copy()
+        # for point in self._points_on_2d[:]:
+        #     # Avoid overflow errors
+        #     try:
+        #         camera_img = cv2.circle(
+        #             camera_img,
+        #             (int(point[0]), int(point[1])),
+        #             1,
+        #             (255, 0, 0),
+        #             -1,
+        #         )
+        #     except Exception as e:
+        #         print(e)
+        #         pass
+        # self._image_lidar_points_v2 = camera_img
 
     def get_camera_image(self):
         """Get the camera image."""
@@ -459,35 +446,110 @@ class MainNode:
 
     def get_image_detection(self):
         """Get the image detection."""
-
         image = self.get_camera_image()
-        self._image_detection = self._analyzer.analizer(image)
 
-        return self._image_detection
+        red_objects: List[ObjectParameters] = self._analyzer.detect_red(image)
+        red_count, img_red = self.get_fruit_localization(red_objects, image)
+        self._fruits_red_count += red_count
 
-    def get_fruit_localization(self):
-        """Get localization of fruit based on image and lidar."""
-        fruit_center = [-7, 15, -2]
+        yellow_objects: List[ObjectParameters] = self._analyzer.detect_yellow(image)
+        yellow_count, img_yellow = self.get_fruit_localization(yellow_objects, img_red)
+        self._fruits_yellow_count += yellow_count
 
-        gps_position = self.get_gps_position()
-        if self._imu_data is not None and gps_position is not None:
-            rotation_euler = euler_from_quaternion(
-                [
-                    self._imu_data.orientation.x,
-                    self._imu_data.orientation.y,
-                    self._imu_data.orientation.z,
-                    self._imu_data.orientation.w,
-                ]
-            )
+        return img_yellow
 
-            yaw_offset = 1.1868
-            rot_matrix = euler_matrix(
-                rotation_euler[0], rotation_euler[1] + yaw_offset, rotation_euler[2]
-            )[:3, :3]
+    def get_fruit_localization(
+        self, image_objects: List[ObjectParameters], image: np.ndarray
+    ) -> Tuple[int, np.ndarray]:
+        """Update the internal fruits' 3D positions.
 
-            fruit_localization = np.dot(rot_matrix, fruit_center) + gps_position
+        Args:
+            image_objects (List[ObjectParameters]): The detected objects in the image.
+            image (np.ndarray): The camera image.
 
-            return fruit_localization
+        Returns:
+            Tuple[int, np.ndarray]: The number of new detections and the fruits marked \
+            in the image.
+        """
+        n_new_detections = 0
+        # Check if necessary data is available
+        if self._imu_rpy_current is not None and self._gps_position is not None:
+            obj: ObjectParameters
+            for obj in image_objects:
+                fruit_x = float(obj.x)
+                fruit_y = float(obj.y)
+
+                # From camera image to camera plane
+                camera_plane_point = np.dot(
+                    np.linalg.inv(self._camera_intrinsics),
+                    np.array([fruit_x, fruit_y, 1.0]),
+                )
+
+                # Get closest lidar points to the fruits
+                points_on_2d = np.delete(self._points_on_2d, 2, 1)
+                distances = np.linalg.norm(
+                    points_on_2d - np.array([fruit_x, fruit_y]), axis=1
+                )
+                closest_indices = list(np.argsort(distances)[:N_CLOSEST_POINTS])
+
+                # Use distance from lidar to scale the points
+                avg_distance = np.mean(self._lidar_points_distances[closest_indices])
+                camera_plane_point *= avg_distance
+
+                # Rotate points to the camera frame
+                # x_frame = z_plane
+                # y_frame = -x_plane
+                # z_frame = -y_plane
+                camera_frame_point = np.zeros(camera_plane_point.shape)
+                camera_frame_point[0] = camera_plane_point[2]
+                camera_frame_point[1] = -camera_plane_point[0]
+                camera_frame_point[2] = -camera_plane_point[1]
+
+                # Transform the points to the IMU frame
+                imu_origin_point = camera_frame_point + self._camera_in_imu_coords
+
+                # Rotate the points to the global frame
+                rot_matrix = euler_matrix(
+                    self._imu_rpy_current[0],
+                    self._imu_rpy_current[1],
+                    self._imu_rpy_current[2],
+                )[:3, :3]
+                fruit_in_3d = np.dot(rot_matrix, imu_origin_point) + self._gps_position
+
+                # Update fruit xyz
+                if self._fruits_xyz is None:
+                    self._fruits_xyz = fruit_in_3d.reshape(1, -1)
+                    n_new_detections += 1
+                    cv2.rectangle(
+                        image,
+                        (obj.bbox[0], obj.bbox[1]),
+                        (obj.bbox[0] + obj.bbox[2], obj.bbox[1] + obj.bbox[3]),
+                        (0, 255, 0),
+                        2,
+                    )
+                    rospy.loginfo(
+                        f"First fruit detected at {fruit_in_3d} "
+                        f"({len(self._fruits_xyz)})"
+                    )
+                else:
+                    # Check if the fruit is close to an existing one
+                    distances = np.linalg.norm(self._fruits_xyz - fruit_in_3d, axis=1)
+                    if np.min(distances) > NEW_FRUIT_PROXIMITY_THRESHOLD:
+                        self._fruits_xyz = np.vstack((self._fruits_xyz, fruit_in_3d))
+                        n_new_detections += 1
+                        cv2.rectangle(
+                            image,
+                            (obj.bbox[0], obj.bbox[1]),
+                            (obj.bbox[0] + obj.bbox[2], obj.bbox[1] + obj.bbox[3]),
+                            (0, 255, 0),
+                            2,
+                        )
+                        rospy.loginfo(
+                            f"New fruit detected at {fruit_in_3d} "
+                            f"({len(self._fruits_xyz)})"
+                        )
+
+        return n_new_detections, image
 
     def get_gps_position(self) -> np.ndarray:
         """Get the GPS position in meters.
@@ -516,25 +578,26 @@ class MainNode:
 
         return np.array([x_imu, y_imu, z_imu])
 
-    def process_image(self):
-        """Process the image."""
-        image = self.get_camera_image()
-
-        # Image segmentation to get fruits
-        # TODO
-
-        # CCL to find the exact location of the fruits
-        # TODO
-
-        # Use SVM to check if the detected object is a fruit
-        # TODO
-
     def publish_fruit_detections(self):
         """Publish the fruit detections in the image."""
         # camera_image = self.get_camera_image().copy()
         image_detection = self.get_image_detection()
         msg = self._cv_bridge.cv2_to_imgmsg(image_detection, "bgr8")
         self._pub_camera.publish(msg)
+
+    def publish_fruit_red_count(self):
+        """Publish the red fruit count."""
+        msg = Int32()
+        msg.data = self._fruits_red_count
+        self._pub_red_fruit_count.publish(msg)
+        rospy.loginfo(f"Red fruit count: {self._fruits_red_count}")
+
+    def publish_fruit_yellow_count(self):
+        """Publish the yellow fruit count."""
+        msg = Int32()
+        msg.data = self._fruits_yellow_count
+        self._pub_yellow_fruit_count.publish(msg)
+        rospy.loginfo(f"Yellow fruit count: {self._fruits_yellow_count}")
 
     def publish_global_map(self):
         """Publish the global map."""
@@ -642,10 +705,11 @@ class MainNode:
         while not rospy.is_shutdown():
             self._rate.sleep()
             self.publish_fruit_detections()
-            # self.publish_global_map()
+            self.publish_global_map()
+            self.publish_gps_position()
             # self.get_fruit_localization()
-            self.publish_image_lidar_points()
-            self.publish_image_lidar_points_v2()
+            # self.publish_image_lidar_points()
+            # self.publish_image_lidar_points_v2()
 
 
 if __name__ == "__main__":
