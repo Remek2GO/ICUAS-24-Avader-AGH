@@ -287,6 +287,13 @@ class AnalyzeFrame:
                 self.objects_yellow.remove(obj)
                 # print('Object with ID:', obj.id, 'is now tracked')
 
+        # Return the visual objects
+        visual_yellow = [obj for obj in self.objects_yellow]
+        visual_yellow.extend(self.trackedObjects_yellow)
+        return visual_yellow
+
+    
+
         # Display the frame with potential objects
         for obj in self.objects_yellow:
             if not obj.visible:
@@ -479,6 +486,11 @@ class AnalyzeFrame:
                 self.trackedObjects_red.append(obj)
                 self.objects_red.remove(obj)
 
+        # Return the visual objects
+        visual_red = [obj for obj in self.objects_red]
+        visual_red.extend(self.trackedObjects_red)
+        return visual_red
+    
         # Display the frame with potential objects
         for obj in self.objects_red:
             if not obj.visible:

@@ -22,7 +22,7 @@ import sys
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
-from scripts.ImageProcessing.Tracking import AnalyzeFrame, ObjectParameters
+from scripts.ImageProcessing.Tracking_new import AnalyzeFrame, ObjectParameters
 
 TOPIC_CAMERA = "/camera/color/image_raw/compressed"
 TOPIC_FRUIT_DETECTIONS = "/fruit_detections"
@@ -659,6 +659,7 @@ class MainNode:
             # self.get_fruit_localization()
             # self.publish_image_lidar_points()
             # self.publish_image_lidar_points_v2()
+
 
 
 if __name__ == "__main__":
