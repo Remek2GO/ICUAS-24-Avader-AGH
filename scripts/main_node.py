@@ -43,7 +43,7 @@ E2 = 6.69437999014e-3  # eccentricity, WGS84
 G = 9.81  # gravity acceleration, m/s^2
 LIDAR_FRAME_WINDOW = 10
 N_CLOSEST_POINTS = 5
-NEW_FRUIT_PROXIMITY_THRESHOLD = 0.3  # meters
+NEW_FRUIT_PROXIMITY_THRESHOLD = 2  # meters
 
 
 class MainNode:
@@ -364,7 +364,7 @@ class MainNode:
         #     self._global_map.append(local_map)
 
         # Transform the lidar data to the camera frame
-        lidar_rotation = euler_matrix(0.0, -np.pi / 18, 0.0)[:3, :3]
+        lidar_rotation = euler_matrix(0.0, -np.pi / 18, -0.0)[:3, :3]
         lidar_translation = np.array([-0.083, 0.0, 0.126])
         points_lidar_in_camera_coords = (
             np.dot(lidar_rotation, np.array(points)[:, :3].T).T + lidar_translation.T
@@ -450,17 +450,15 @@ class MainNode:
         image = self.get_camera_image()
 
         red_objects: List[ObjectParameters] = self._analyzer.detect_red(image)
-        red_count, img_red = self.get_fruit_localization(red_objects, image)
-        self._fruits_red_count += red_count
+        red_count, img_red = self.get_fruit_localization(red_objects, image, "Red")
 
         yellow_objects: List[ObjectParameters] = self._analyzer.detect_yellow(image)
-        yellow_count, img_yellow = self.get_fruit_localization(yellow_objects, img_red)
-        self._fruits_yellow_count += yellow_count
+        yellow_count, img_yellow = self.get_fruit_localization(yellow_objects, img_red, "Yellow")
 
         return img_yellow
 
     def get_fruit_localization(
-        self, image_objects: List[ObjectParameters], image: np.ndarray
+        self, image_objects: List[ObjectParameters], image: np.ndarray, color: str
     ) -> Tuple[int, np.ndarray]:
         """Update the internal fruits' 3D positions.
 
@@ -492,6 +490,11 @@ class MainNode:
                 distances = np.linalg.norm(
                     points_on_2d - np.array([fruit_x, fruit_y]), axis=1
                 )
+
+                distances = np.sort(distances)
+                if distances[0] >10:
+                    continue
+
                 closest_indices = list(np.argsort(distances)[:N_CLOSEST_POINTS])
 
                 # Use distance from lidar to scale the points
@@ -530,7 +533,7 @@ class MainNode:
                         2,
                     )
                     rospy.loginfo(
-                        f"First fruit detected at {fruit_in_3d} "
+                        # f"First fruit detected at {fruit_in_3d} "
                         f"({len(self._fruits_xyz)})"
                     )
                 else:
@@ -539,12 +542,25 @@ class MainNode:
                     if np.min(distances) > NEW_FRUIT_PROXIMITY_THRESHOLD:
                         self._fruits_xyz = np.vstack((self._fruits_xyz, fruit_in_3d))
                         n_new_detections += 1
+                        if color == "Red":
+                            self._fruits_red_count +=1
+                        elif color == "Yellow":
+                            self._fruits_yellow_count += 1
                         cv2.rectangle(
                             image,
                             (obj.bbox[0], obj.bbox[1]),
                             (obj.bbox[0] + obj.bbox[2], obj.bbox[1] + obj.bbox[3]),
                             (0, 255, 0),
                             2,
+                        )
+                        cv2.putText(
+                            image,
+                            color + str(obj.id),
+                            (obj.bbox[0], obj.bbox[1] - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.3,
+                            (0, 255, 0),
+                            1,
                         )
                         rospy.loginfo(
                             f"New fruit detected at {fruit_in_3d} "
