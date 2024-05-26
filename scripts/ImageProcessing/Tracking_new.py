@@ -46,7 +46,7 @@ class AnalyzeFrame:
             cv2.IMREAD_GRAYSCALE,
         )
         self._pattern_yellow = cv2.imread(
-            "/root/sim_ws/src/icuas24_competition/scripts/ImageProcessing//pattern_yellow.png",
+            "/root/sim_ws/src/icuas24_competition/scripts/ImageProcessing/pattern_yellow.png",
             cv2.IMREAD_GRAYSCALE,
         )
 
@@ -99,7 +99,7 @@ class AnalyzeFrame:
         return features
 
     def svm_predict(self, predict_data, obj, objects):
-        
+
         y_pred = 0
         color = (0, 0, 0)
         if predict_data is not None:
@@ -110,12 +110,12 @@ class AnalyzeFrame:
                 _, y_pred = self._svm_classifier.predict(features.reshape(1, -1))
                 y_pred = y_pred[0][0]
 
-        if y_pred == 1: # red
+        if y_pred == 1:  # red
             color = (0, 255, 255)
             objects.remove(obj)
-        elif y_pred == 2: # yellow
+        elif y_pred == 2:  # yellow
             color = (0, 0, 255)
-        elif y_pred == 3: # backgrond
+        elif y_pred == 3:  # backgrond
             color = (0, 0, 0)
             objects.remove(obj)
 
@@ -292,8 +292,6 @@ class AnalyzeFrame:
         visual_yellow.extend(self.trackedObjects_yellow)
         return visual_yellow
 
-    
-
         # Display the frame with potential objects
         for obj in self.objects_yellow:
             if not obj.visible:
@@ -322,7 +320,9 @@ class AnalyzeFrame:
             x, y, w, h = int(x), int(y), int(w), int(h)
 
             predict_data = frame[y : y + h, x : x + w]
-            y_pred, color = self.svm_predict(predict_data, obj, self.trackedObjects_yellow)
+            y_pred, color = self.svm_predict(
+                predict_data, obj, self.trackedObjects_yellow
+            )
 
             if obj.visible and y_pred == 2:
                 cv2.rectangle(frame, (x, y), (x + w, y + h), color, 1)
@@ -335,7 +335,6 @@ class AnalyzeFrame:
                     (0, 0, 255),
                     1,
                 )
-
 
         return frame
 
@@ -490,7 +489,7 @@ class AnalyzeFrame:
         visual_red = [obj for obj in self.objects_red]
         visual_red.extend(self.trackedObjects_red)
         return visual_red
-    
+
         # Display the frame with potential objects
         for obj in self.objects_red:
             if not obj.visible:
