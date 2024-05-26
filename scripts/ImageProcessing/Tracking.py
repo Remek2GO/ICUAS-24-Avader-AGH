@@ -56,17 +56,91 @@ class AnalyzeFrame:
     def distance(self, x1, y1, x2, y2):
         return ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
 
+    def get_fruits_info(self, frame):
+        currect_fruits = []
+        image_luv = cv2.cvtColor(frame, cv2.COLOR_BGR2Luv)
+        image_luv_l, image_luv_u, image_luv_v = cv2.split(image_luv)
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
+        image_tophat_luv_u = cv2.morphologyEx(image_luv_u, cv2.MORPH_TOPHAT, kernel)
+        # image_tophat_luv_u = cv2.GaussianBlur(image_tophat_luv_u, (17, 17), 0)
+
+        # Print max value of the image
+        # print(image_tophat_luv_u.max())
+
+        # Normalize the image
+        # image_tophat_luv_u_norm = cv2.normalize(image_tophat_luv_u, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
+
+        # Display the red apples
+        # cv2.imshow('Tophat LUV U', image_tophat_luv_u_norm)
+
+        # Binarize the image
+        image_bin = image_tophat_luv_u > 10
+
+        # Median filter
+        image_bin = cv2.medianBlur(image_bin.astype("uint8"), 5)
+
+        # Display the binarized image
+        # cv2.imshow('Binary', image_bin.astype('uint8') * 255)
+
+        # Track objects using the CSRT tracker
+        for obj in self.trackedObjects.copy():
+            success, bbox = obj.tracker.update(frame)
+            if success:
+                obj.bbox = bbox
+                obj.x = bbox[0] + bbox[2] / 2
+                obj.y = bbox[1] + bbox[3] / 2
+                obj.visible = True
+                obj.invisibleCounter = 0
+                obj.visibleCounter += 1
+            else:
+                obj.visible = False
+                obj.invisibleCounter += 1
+                if obj.invisibleCounter > 50:
+                    self.trackedObjects.remove(obj)
+
+        # Remove the tracked pixels from the image_bin
+        for obj in self.trackedObjects:
+            x, y, w, h = obj.bbox
+            x, y, w, h = int(x), int(y), int(w), int(h)
+
+            image_bin[y : y + h, x : x + w] = 0
+
+        # Perform CCL and filter small objects
+        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+            image_bin.astype("uint8"), connectivity=8
+        )
+
+        # Intersection over Union tracking
+        for i in range(1, num_labels):
+            if stats[i, cv2.CC_STAT_AREA] < 10:
+                continue
+
+            x, y, w, h = (
+                stats[i, cv2.CC_STAT_LEFT],
+                stats[i, cv2.CC_STAT_TOP],
+                stats[i, cv2.CC_STAT_WIDTH],
+                stats[i, cv2.CC_STAT_HEIGHT],
+            )
+            bbox = (x, y, w, h)
+            x_c = centroids[i, 0]
+            y_c = centroids[i, 1]
+            area = stats[i, cv2.CC_STAT_AREA]
+
+            # Initialize the object parameters
+            obj = ObjectParameters(i, bbox, x_c, y_c, area, (0, 0, 0))
+
+            currect_fruits.append(obj)
+        return currect_fruits
+
     def analizer(self, frame):
         image_luv = cv2.cvtColor(frame, cv2.COLOR_BGR2Luv)
-        img = frame.copy()  
+        img = frame.copy()
         image_luv_l, image_luv_u, image_luv_v = cv2.split(image_luv)
         YCBCR = cv2.cvtColor(frame, cv2.COLOR_BGR2YCrCb)
         Y, Cr, Cb = cv2.split(YCBCR)
 
-
-        image2 = np.uint32(image_luv_u)*np.uint32(~Cb)
-        image2_vis = np.uint8(image2/np.max(image2) * 255)
-
+        image2 = np.uint32(image_luv_u) * np.uint32(~Cb)
+        image2_vis = np.uint8(image2 / np.max(image2) * 255)
 
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
         image_tophat_luv_u = cv2.morphologyEx(image_luv_u, cv2.MORPH_TOPHAT, kernel)
