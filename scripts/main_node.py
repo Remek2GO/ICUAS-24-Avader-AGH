@@ -518,7 +518,7 @@ class MainNode:
 
                 # Update fruit xyz
                 if self._fruits_xyz is None:
-                    self._fruits_xyz = fruit_in_3d
+                    self._fruits_xyz = fruit_in_3d.reshape(1, -1)
                     n_new_detections += 1
                     cv2.rectangle(
                         image,
@@ -549,7 +549,7 @@ class MainNode:
                             f"({len(self._fruits_xyz)})"
                         )
 
-        return n_new_detections
+        return n_new_detections, image
 
     def get_gps_position(self) -> np.ndarray:
         """Get the GPS position in meters.

@@ -4,11 +4,12 @@ from dataclasses import dataclass
 import numpy as np
 import os
 import sys
+import copy
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
-from scripts.ImageProcessing.dcf import initialize, predict
+# from scripts.ImageProcessing.dcf import initialize, predict
 
 
 @dataclass
@@ -155,7 +156,7 @@ class AnalyzeFrame:
         image_bin = cv2.medianBlur(image_bin.astype("uint8"), 5)
 
         # Track objects using the CSRT tracker
-        for obj in self.trackedObjects_yellow.copy():
+        for obj in copy.deepcopy(self.trackedObjects_yellow):
             success, bbox = obj.tracker.update(frame)
             if success:
                 obj.bbox = bbox
@@ -204,6 +205,7 @@ class AnalyzeFrame:
             obj = ObjectParameters(i, bbox, x_c, y_c, area)
 
             self.tempObjects_yellow.append(obj)
+        return self.tempObjects_yellow
 
         # Set all objects to invisible
         for obj in self.objects_yellow:
@@ -273,13 +275,13 @@ class AnalyzeFrame:
         self.tempObjects_yellow.clear()
 
         # Analyse non-visible objects
-        for obj in self.objects_yellow.copy():
+        for obj in copy.deepcopy(self.objects_yellow):
             if not obj.visible:
                 obj.invisibleCounter += 1
                 if obj.invisibleCounter > 50:
                     self.objects_yellow.remove(obj)
 
-        for obj in self.objects_yellow.copy():
+        for obj in copy.deepcopy(self.objects_yellow):
             # print('Object with ID:', obj.id, 'is visible for', obj.visibleCounter, 'frames')
             if obj.visibleCounter > 10:
                 obj.tracker = self.initializecorrfilter(frame, int(obj.x), int(obj.y))
@@ -357,7 +359,7 @@ class AnalyzeFrame:
         image_bin = cv2.medianBlur(image_bin.astype("uint8"), 5)
 
         # Track objects using the CSRT tracker
-        for obj in self.trackedObjects_red.copy():
+        for obj in copy.deepcopy(self.trackedObjects_red):
             success, bbox = obj.tracker.update(frame)
             if success:
                 obj.bbox = bbox
@@ -403,6 +405,8 @@ class AnalyzeFrame:
             obj = ObjectParameters(i, bbox, x_c, y_c, area)
 
             self.tempObjects_red.append(obj)
+
+        return self.tempObjects_red
 
         # Set all objects to invisible
         for obj in self.objects_red:
@@ -473,13 +477,13 @@ class AnalyzeFrame:
         self.tempObjects_red.clear()
 
         # Analyse non-visible objects
-        for obj in self.objects_red.copy():
+        for obj in copy.deepcopy(self.objects_red):
             if not obj.visible:
                 obj.invisibleCounter += 1
                 if obj.invisibleCounter > 50:
                     self.objects_red.remove(obj)
 
-        for obj in self.objects_red.copy():
+        for obj in copy.deepcopy(self.objects_red):
             if obj.visibleCounter > 10:
                 obj.tracker = self.initializecorrfilter(frame, int(obj.x), int(obj.y))
                 self.trackedObjects_red.append(obj)
