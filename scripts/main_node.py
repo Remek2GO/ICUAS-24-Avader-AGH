@@ -15,6 +15,7 @@ from std_msgs.msg import Header, Int32
 from tf.transformations import euler_from_quaternion, euler_matrix
 import message_filters
 from typing import List, Tuple
+import copy
 
 import os
 import sys
@@ -42,7 +43,7 @@ E2 = 6.69437999014e-3  # eccentricity, WGS84
 G = 9.81  # gravity acceleration, m/s^2
 LIDAR_FRAME_WINDOW = 10
 N_CLOSEST_POINTS = 5
-NEW_FRUIT_PROXIMITY_THRESHOLD = 0.1  # meters
+NEW_FRUIT_PROXIMITY_THRESHOLD = 0.3  # meters
 
 
 class MainNode:
@@ -487,13 +488,14 @@ class MainNode:
 
                 # Get closest lidar points to the fruits
                 points_on_2d = np.delete(self._points_on_2d, 2, 1)
+                lidar_points_distances = copy.deepcopy(self._lidar_points_distances)
                 distances = np.linalg.norm(
                     points_on_2d - np.array([fruit_x, fruit_y]), axis=1
                 )
                 closest_indices = list(np.argsort(distances)[:N_CLOSEST_POINTS])
 
                 # Use distance from lidar to scale the points
-                avg_distance = np.mean(self._lidar_points_distances[closest_indices])
+                avg_distance = np.mean(lidar_points_distances[closest_indices])
                 camera_plane_point *= avg_distance
 
                 # Rotate points to the camera frame
@@ -546,7 +548,7 @@ class MainNode:
                         )
                         rospy.loginfo(
                             f"New fruit detected at {fruit_in_3d} "
-                            f"({len(self._fruits_xyz)})"
+                            f"({np.min(distances):.2f})"
                         )
 
         return n_new_detections, image
